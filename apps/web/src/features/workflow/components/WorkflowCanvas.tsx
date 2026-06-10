@@ -1,7 +1,12 @@
-import { memo, useCallback, useMemo } from "react";
+import {
+  memo,
+  useCallback,
+  useMemo,
+  useState,
+  type MouseEvent as ReactMouseEvent
+} from "react";
 import {
   Background,
-  Controls,
   getOutgoers,
   Handle,
   MiniMap,
@@ -9,13 +14,15 @@ import {
   ReactFlow,
   useReactFlow,
   type IsValidConnection,
-  type NodeProps
+  type NodeProps,
+  type XYPosition
 } from "@xyflow/react";
 import {
   arePortsCompatible,
   getNodeDefinition,
   getPort,
-  nodeDefinitions
+  nodeDefinitions,
+  type NodeCategory
 } from "@eval/workflow-schema";
 import { Badge } from "@eval/ui";
 import {
@@ -31,15 +38,34 @@ type ConnectionCandidate = {
   targetHandle?: string | null;
 };
 
+type ContextMenuState = {
+  flowPosition: XYPosition;
+  x: number;
+  y: number;
+};
+
+const categoryLabels: Record<NodeCategory, string> = {
+  input: "Input",
+  prompt: "Prompt",
+  generation: "Generation",
+  artifact: "Artifact",
+  eval: "Eval",
+  aggregate: "Aggregate",
+  decision: "Decision"
+};
+
 export function WorkflowCanvas() {
+  const [contextMenu, setContextMenu] = useState<ContextMenuState>();
+  const canvasTool = useWorkflowStore((state) => state.canvasTool);
   const nodes = useWorkflowStore((state) => state.nodes);
   const edges = useWorkflowStore((state) => state.edges);
+  const addNodeAt = useWorkflowStore((state) => state.addNodeAt);
   const onNodesChange = useWorkflowStore((state) => state.onNodesChange);
   const onEdgesChange = useWorkflowStore((state) => state.onEdgesChange);
   const onConnect = useWorkflowStore((state) => state.onConnect);
   const selectNode = useWorkflowStore((state) => state.selectNode);
   const setViewport = useWorkflowStore((state) => state.setViewport);
-  const { getNodes, getEdges } = useReactFlow<EvalFlowNode>();
+  const { getNodes, getEdges, screenToFlowPosition } = useReactFlow<EvalFlowNode>();
 
   const nodeTypes = useMemo(
     () =>
@@ -63,6 +89,39 @@ export function WorkflowCanvas() {
     }),
     []
   );
+  const groupedNodeDefinitions = useMemo(
+    () =>
+      nodeDefinitions.reduce(
+        (groups, definition) => {
+          groups[definition.category] = [
+            ...(groups[definition.category] ?? []),
+            definition
+          ];
+          return groups;
+        },
+        {} as Record<NodeCategory, typeof nodeDefinitions>
+      ),
+    []
+  );
+
+  const handlePaneContextMenu = useCallback(
+    (event: MouseEvent | ReactMouseEvent<Element>) => {
+      event.preventDefault();
+      selectNode(undefined);
+
+      const currentTarget = event.currentTarget as Element;
+      const bounds = currentTarget.getBoundingClientRect();
+      setContextMenu({
+        flowPosition: screenToFlowPosition({
+          x: event.clientX,
+          y: event.clientY
+        }),
+        x: event.clientX - bounds.left,
+        y: event.clientY - bounds.top
+      });
+    },
+    [screenToFlowPosition, selectNode]
+  );
 
   return (
     <section className="canvas-shell" aria-label="Workflow canvas">
@@ -79,11 +138,51 @@ export function WorkflowCanvas() {
         onMoveEnd={(_, viewport) => setViewport(viewport)}
         onNodeClick={(_, node) => selectNode(node.id)}
         onNodesChange={onNodesChange}
-        onPaneClick={() => selectNode(undefined)}
+        onPaneClick={() => {
+          selectNode(undefined);
+          setContextMenu(undefined);
+        }}
+        onPaneContextMenu={handlePaneContextMenu}
+        panOnDrag={canvasTool === "pan"}
+        selectionOnDrag={canvasTool === "select"}
       >
         <Background gap={24} />
-        <Controls position="bottom-left" />
         <MiniMap pannable position="bottom-right" zoomable />
+        {contextMenu ? (
+          <div
+            className="canvas-context-menu"
+            role="menu"
+            style={{
+              left: contextMenu.x,
+              top: contextMenu.y
+            }}
+          >
+            <div className="canvas-context-menu__title">Add eval node</div>
+            {(
+              Object.entries(groupedNodeDefinitions) as Array<
+                [NodeCategory, typeof nodeDefinitions]
+              >
+            ).map(([category, definitions]) => (
+              <div className="canvas-context-menu__group" key={category}>
+                <span>{categoryLabels[category]}</span>
+                {definitions.map((definition) => (
+                  <button
+                    className="canvas-context-menu__item"
+                    key={definition.type}
+                    onClick={() => {
+                      addNodeAt(definition.type, contextMenu.flowPosition);
+                      setContextMenu(undefined);
+                    }}
+                    role="menuitem"
+                    type="button"
+                  >
+                    {definition.title}
+                  </button>
+                ))}
+              </div>
+            ))}
+          </div>
+        ) : null}
       </ReactFlow>
     </section>
   );

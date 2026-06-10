@@ -21,8 +21,10 @@ import type { CompileResponse, RunResponse } from "../../../shared/api/evalApi";
 export type EvalFlowNodeData = WorkflowNodeData & Record<string, unknown>;
 export type EvalFlowNode = Node<EvalFlowNodeData, string>;
 export type EvalFlowEdge = Edge;
+export type CanvasTool = "select" | "pan";
 
 type WorkflowState = {
+  canvasTool: CanvasTool;
   compileResult: CompileResponse | undefined;
   edges: EvalFlowEdge[];
   nodes: EvalFlowNode[];
@@ -30,11 +32,13 @@ type WorkflowState = {
   selectedNodeId: string | undefined;
   viewport: Viewport | undefined;
   addNode: (type: string) => void;
+  addNodeAt: (type: string, position?: { x: number; y: number }) => void;
   onConnect: (connection: Connection) => void;
   onEdgesChange: (changes: EdgeChange<EvalFlowEdge>[]) => void;
   onNodesChange: (changes: NodeChange<EvalFlowNode>[]) => void;
   selectNode: (nodeId?: string) => void;
   setCompileResult: (result: CompileResponse) => void;
+  setCanvasTool: (tool: CanvasTool) => void;
   setRunResult: (result: RunResponse) => void;
   setViewport: (viewport: Viewport) => void;
   toDraft: () => WorkflowDraft;
@@ -52,6 +56,7 @@ const initialNodes = starterWorkflowDraft.nodes.map((node) => ({
 const initialEdges = starterWorkflowDraft.edges satisfies EvalFlowEdge[];
 
 export const useWorkflowStore = create<WorkflowState>((set, get) => ({
+  canvasTool: "select",
   edges: initialEdges,
   nodes: initialNodes,
   compileResult: undefined,
@@ -59,6 +64,9 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
   selectedNodeId: initialNodes[0]?.id,
   viewport: undefined,
   addNode: (type) => {
+    get().addNodeAt(type);
+  },
+  addNodeAt: (type, position) => {
     const definition = getNodeDefinition(type);
     if (!definition) {
       return;
@@ -70,8 +78,8 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
       id,
       type,
       position: {
-        x: 120 + (index % 4) * 280,
-        y: 120 + Math.floor(index / 4) * 180
+        x: position?.x ?? 120 + (index % 4) * 280,
+        y: position?.y ?? 120 + Math.floor(index / 4) * 180
       },
       data: {
         label: definition.title,
@@ -114,6 +122,9 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
   },
   setCompileResult: (result) => {
     set({ compileResult: result });
+  },
+  setCanvasTool: (tool) => {
+    set({ canvasTool: tool });
   },
   setRunResult: (result) => {
     set({ runResult: result });
