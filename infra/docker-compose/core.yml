@@ -1,0 +1,42 @@
+services:
+  api:
+    image: node:22-alpine
+    command: sh -lc "corepack enable && pnpm install && pnpm --filter @eval/api dev"
+    env_file:
+      - ../env/.env.example
+    ports:
+      - "4310:4310"
+    volumes:
+      - ../..:/workspace
+    working_dir: /workspace
+
+  web:
+    image: node:22-alpine
+    command: sh -lc "corepack enable && pnpm install && pnpm --filter @eval/web dev"
+    depends_on:
+      - api
+    environment:
+      VITE_API_BASE_URL: /api
+    ports:
+      - "5173:5173"
+    volumes:
+      - ../..:/workspace
+    working_dir: /workspace
+
+  generation-worker:
+    image: node:22-alpine
+    command: sh -lc "corepack enable && pnpm install && pnpm --filter @eval/generation-worker start"
+    env_file:
+      - ../env/.env.example
+    volumes:
+      - ../..:/workspace
+    working_dir: /workspace
+
+  metric-worker:
+    image: node:22-alpine
+    command: sh -lc "corepack enable && pnpm install && pnpm --filter @eval/metric-worker start"
+    env_file:
+      - ../env/.env.example
+    volumes:
+      - ../..:/workspace
+    working_dir: /workspace

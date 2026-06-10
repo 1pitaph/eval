@@ -1,0 +1,8 @@
+packages:
+  - "apps/*"
+  - "packages/*"
+  - "workers/*"
+allowBuilds:
+  esbuild: true
+minimumReleaseAgeExclude:
+  - prettier@3.8.4
