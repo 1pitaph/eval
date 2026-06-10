@@ -6,10 +6,20 @@ import { NodePalette } from "../features/workflow/components/NodePalette";
 import { ResultsWorkbench } from "../features/workflow/components/ResultsWorkbench";
 import { RunPanel } from "../features/workflow/components/RunPanel";
 import { WorkflowCanvas } from "../features/workflow/components/WorkflowCanvas";
+import { BlindPairwiseReviewer } from "../features/review/components/BlindPairwiseReviewer";
 import { compileWorkflow, startRun } from "../shared/api/evalApi";
 import { useWorkflowStore } from "../features/workflow/state/workflowStore";
 
 export function App() {
+  const reviewToken = reviewTokenFromPath(window.location.pathname);
+  if (reviewToken) {
+    return <BlindPairwiseReviewer token={reviewToken} />;
+  }
+
+  return <StudioApp />;
+}
+
+function StudioApp() {
   const toDraft = useWorkflowStore((state) => state.toDraft);
   const setCompileResult = useWorkflowStore((state) => state.setCompileResult);
   const setRunResult = useWorkflowStore((state) => state.setRunResult);
@@ -66,4 +76,9 @@ export function App() {
       </div>
     </ReactFlowProvider>
   );
+}
+
+function reviewTokenFromPath(pathname: string) {
+  const match = /^\/review\/([^/]+)$/.exec(pathname);
+  return match?.[1] ? decodeURIComponent(match[1]) : undefined;
 }

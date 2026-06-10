@@ -23,6 +23,7 @@ import {
 import { Badge, Button, Panel } from "@eval/ui";
 import { exportRunUrl } from "../../../shared/api/evalApi";
 import { useWorkflowStore } from "../state/workflowStore";
+import { ReviewCampaignPanel } from "./ReviewCampaignPanel";
 
 type WorkbenchTab = "gallery" | "compare" | "pareto" | "human";
 type ReviewDraft = Pick<HumanReview, "comment" | "score" | "verdict">;
@@ -164,6 +165,8 @@ export function ResultsWorkbench() {
               <span>{run.decision.message}</span>
             </div>
           </div>
+
+          <ReviewCampaignPanel key={run.id} run={run} setRunResult={setRunResult} />
 
           <div className="results-toolbar">
             <div className="segmented-control" role="tablist">

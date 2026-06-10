@@ -495,7 +495,143 @@ export const PairwiseComparisonSchema = z.object({
   leftArtifactId: z.string().min(1),
   rightArtifactId: z.string().min(1),
   preferredArtifactId: z.string().min(1).optional(),
-  reason: z.string().optional()
+  reason: z.string().optional(),
+  voteCount: z.number().int().nonnegative().optional(),
+  tieCount: z.number().int().nonnegative().optional(),
+  leftWinRate: z.number().min(0).max(1).optional(),
+  rightWinRate: z.number().min(0).max(1).optional(),
+  agreementRate: z.number().min(0).max(1).optional()
+});
+
+export const ReviewCampaignModeSchema = z.enum(["pairwise"]);
+
+export const ReviewCampaignStatusSchema = z.enum([
+  "draft",
+  "open",
+  "closed",
+  "completed"
+]);
+
+export const ReviewTaskKindSchema = z.enum(["pairwise_vote"]);
+
+export const ReviewTaskStatusSchema = z.enum(["pending", "completed"]);
+
+export const ReviewLinkScopeSchema = z.enum(["campaign"]);
+
+export const ReviewerSessionStatusSchema = z.enum(["active", "completed"]);
+
+export const PairwiseVoteChoiceSchema = z.enum([
+  "left",
+  "right",
+  "tie",
+  "both_bad",
+  "skip"
+]);
+
+export const ReviewReasonTagSchema = z.enum([
+  "prompt_adherence",
+  "aesthetic_quality",
+  "text_rendering",
+  "composition",
+  "visual_artifacts",
+  "safety",
+  "brand_fit"
+]);
+
+export const ReviewCampaignSchema = z.object({
+  id: z.string().min(1),
+  runId: z.string().min(1),
+  name: z.string().min(1),
+  mode: ReviewCampaignModeSchema,
+  status: ReviewCampaignStatusSchema,
+  blindMode: z.boolean(),
+  reviewersPerTask: z.number().int().positive(),
+  guidelines: z.string().optional(),
+  reasonTags: z.array(ReviewReasonTagSchema),
+  taskCount: z.number().int().nonnegative(),
+  completedTaskCount: z.number().int().nonnegative(),
+  voteCount: z.number().int().nonnegative(),
+  agreementRate: z.number().min(0).max(1),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
+  expiresAt: z.string().datetime().optional()
+});
+
+export const ReviewTaskSchema = z.object({
+  id: z.string().min(1),
+  runId: z.string().min(1),
+  campaignId: z.string().min(1),
+  kind: ReviewTaskKindSchema,
+  status: ReviewTaskStatusSchema,
+  promptId: z.string().min(1),
+  prompt: z.string().min(1),
+  leftArtifactId: z.string().min(1),
+  rightArtifactId: z.string().min(1),
+  voteCount: z.number().int().nonnegative(),
+  requiredVotes: z.number().int().positive(),
+  orderSeed: z.number().int().nonnegative(),
+  createdAt: z.string().datetime(),
+  completedAt: z.string().datetime().optional()
+});
+
+export const ReviewLinkSchema = z.object({
+  id: z.string().min(1),
+  runId: z.string().min(1),
+  campaignId: z.string().min(1),
+  token: z.string().min(8),
+  url: z.string().min(1),
+  scope: ReviewLinkScopeSchema,
+  maxUses: z.number().int().positive().optional(),
+  useCount: z.number().int().nonnegative(),
+  createdAt: z.string().datetime(),
+  expiresAt: z.string().datetime().optional()
+});
+
+export const ReviewerSessionSchema = z.object({
+  id: z.string().min(1),
+  runId: z.string().min(1),
+  campaignId: z.string().min(1),
+  reviewLinkId: z.string().min(1),
+  displayName: z.string().min(1),
+  status: ReviewerSessionStatusSchema,
+  startedAt: z.string().datetime(),
+  completedAt: z.string().datetime().optional()
+});
+
+export const PairwiseVoteSchema = z.object({
+  id: z.string().min(1),
+  runId: z.string().min(1),
+  campaignId: z.string().min(1),
+  taskId: z.string().min(1),
+  sessionId: z.string().min(1),
+  leftArtifactId: z.string().min(1),
+  rightArtifactId: z.string().min(1),
+  preferred: PairwiseVoteChoiceSchema,
+  preferredArtifactId: z.string().min(1).optional(),
+  reasonTags: z.array(ReviewReasonTagSchema),
+  comment: z.string(),
+  timeSpentMs: z.number().int().nonnegative(),
+  createdAt: z.string().datetime()
+});
+
+export const ReviewArtifactPayloadSchema = z.object({
+  id: z.string().min(1),
+  promptId: z.string().min(1),
+  prompt: z.string().min(1),
+  uri: z.string().min(1),
+  thumbnailUri: z.string().min(1),
+  width: z.number().int().positive(),
+  height: z.number().int().positive(),
+  model: z.string().min(1).optional(),
+  provider: ImageProviderSchema.optional(),
+  tags: z.array(z.string()).default([])
+});
+
+export const ReviewTaskPayloadSchema = z.object({
+  task: ReviewTaskSchema,
+  leftArtifact: ReviewArtifactPayloadSchema,
+  rightArtifact: ReviewArtifactPayloadSchema,
+  submittedVote: PairwiseVoteSchema.optional()
 });
 
 export const ModelSummarySchema = z.object({
@@ -579,6 +715,21 @@ export type ImageArtifact = z.infer<typeof ImageArtifactSchema>;
 export type ImageScore = z.infer<typeof ImageScoreSchema>;
 export type HumanReview = z.infer<typeof HumanReviewSchema>;
 export type PairwiseComparison = z.infer<typeof PairwiseComparisonSchema>;
+export type ReviewCampaignMode = z.infer<typeof ReviewCampaignModeSchema>;
+export type ReviewCampaignStatus = z.infer<typeof ReviewCampaignStatusSchema>;
+export type ReviewTaskKind = z.infer<typeof ReviewTaskKindSchema>;
+export type ReviewTaskStatus = z.infer<typeof ReviewTaskStatusSchema>;
+export type ReviewLinkScope = z.infer<typeof ReviewLinkScopeSchema>;
+export type ReviewerSessionStatus = z.infer<typeof ReviewerSessionStatusSchema>;
+export type PairwiseVoteChoice = z.infer<typeof PairwiseVoteChoiceSchema>;
+export type ReviewReasonTag = z.infer<typeof ReviewReasonTagSchema>;
+export type ReviewCampaign = z.infer<typeof ReviewCampaignSchema>;
+export type ReviewTask = z.infer<typeof ReviewTaskSchema>;
+export type ReviewLink = z.infer<typeof ReviewLinkSchema>;
+export type ReviewerSession = z.infer<typeof ReviewerSessionSchema>;
+export type PairwiseVote = z.infer<typeof PairwiseVoteSchema>;
+export type ReviewArtifactPayload = z.infer<typeof ReviewArtifactPayloadSchema>;
+export type ReviewTaskPayload = z.infer<typeof ReviewTaskPayloadSchema>;
 export type ModelSummary = z.infer<typeof ModelSummarySchema>;
 export type ParetoPoint = z.infer<typeof ParetoPointSchema>;
 export type EvalDecision = z.infer<typeof EvalDecisionSchema>;
