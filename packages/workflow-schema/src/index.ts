@@ -405,6 +405,187 @@ export type WorkflowDraft = z.infer<typeof WorkflowDraftSchema>;
 export type EvalRunSpecNode = z.infer<typeof EvalRunSpecNodeSchema>;
 export type EvalRunSpec = z.infer<typeof EvalRunSpecSchema>;
 
+export const ImageProviderSchema = z.enum([
+  "openai",
+  "google-imagen",
+  "fal",
+  "replicate",
+  "imported"
+]);
+
+export const ImageMetricSchema = z.enum([
+  "vlm_rubric",
+  "clip_siglip",
+  "ocr",
+  "nsfw",
+  "blur",
+  "aesthetic",
+  "cost",
+  "latency"
+]);
+
+export const ReviewVerdictSchema = z.enum(["pass", "fail", "needs_review"]);
+
+export const EvalRunStatusSchema = z.enum(["queued", "running", "succeeded", "failed"]);
+
+export const ImageGenerationJobSchema = z.object({
+  id: z.string().min(1),
+  promptId: z.string().min(1),
+  prompt: z.string().min(1),
+  renderedPrompt: z.string().min(1),
+  model: z.string().min(1),
+  provider: ImageProviderSchema,
+  seed: z.number().int(),
+  sampleIndex: z.number().int().nonnegative(),
+  params: z.record(z.string(), z.unknown()).default({}),
+  tags: z.array(z.string()).default([])
+});
+
+export const ImageArtifactSchema = z.object({
+  id: z.string().min(1),
+  jobId: z.string().min(1),
+  promptId: z.string().min(1),
+  prompt: z.string().min(1),
+  model: z.string().min(1),
+  provider: ImageProviderSchema,
+  uri: z.string().min(1),
+  thumbnailUri: z.string().min(1),
+  storageUri: z.string().min(1),
+  width: z.number().int().positive(),
+  height: z.number().int().positive(),
+  seed: z.number().int(),
+  costUsd: z.number().nonnegative(),
+  latencyMs: z.number().int().nonnegative(),
+  perceptualHash: z.string().min(1),
+  embeddingKey: z.string().min(1),
+  createdAt: z.string().datetime(),
+  lineage: z.object({
+    workflowNodeId: z.string().min(1),
+    source: z.string().min(1)
+  }),
+  params: z.record(z.string(), z.unknown()).default({}),
+  tags: z.array(z.string()).default([])
+});
+
+export const ImageScoreSchema = z.object({
+  id: z.string().min(1),
+  artifactId: z.string().min(1),
+  metric: ImageMetricSchema,
+  score: z.number(),
+  pass: z.boolean(),
+  reason: z.string().min(1),
+  evidence: z.record(z.string(), z.unknown()).default({})
+});
+
+export const HumanReviewSchema = z.object({
+  id: z.string().min(1),
+  artifactId: z.string().min(1),
+  reviewer: z.string().min(1),
+  blind: z.boolean(),
+  verdict: ReviewVerdictSchema,
+  score: z.number().min(0).max(1),
+  comment: z.string(),
+  tags: z.array(z.string()).default([]),
+  createdAt: z.string().datetime()
+});
+
+export const PairwiseComparisonSchema = z.object({
+  id: z.string().min(1),
+  promptId: z.string().min(1),
+  leftArtifactId: z.string().min(1),
+  rightArtifactId: z.string().min(1),
+  preferredArtifactId: z.string().min(1).optional(),
+  reason: z.string().optional()
+});
+
+export const ModelSummarySchema = z.object({
+  model: z.string().min(1),
+  provider: ImageProviderSchema,
+  artifactCount: z.number().int().nonnegative(),
+  approvedCount: z.number().int().nonnegative(),
+  averageQuality: z.number(),
+  humanWinRate: z.number(),
+  safetyPassRate: z.number(),
+  averageCostUsd: z.number().nonnegative(),
+  averageLatencyMs: z.number().nonnegative(),
+  usableArtifactCostUsd: z.number().nonnegative()
+});
+
+export const ParetoPointSchema = z.object({
+  model: z.string().min(1),
+  provider: ImageProviderSchema,
+  qualityScore: z.number(),
+  costUsd: z.number().nonnegative(),
+  latencyMs: z.number().nonnegative(),
+  safetyPassRate: z.number(),
+  isParetoOptimal: z.boolean()
+});
+
+export const EvalGateSchema = z.object({
+  label: z.string().min(1),
+  passed: z.boolean(),
+  actual: z.string().min(1),
+  target: z.string().min(1)
+});
+
+export const EvalDecisionSchema = z.object({
+  status: z.enum(["pass", "warn", "fail"]),
+  message: z.string().min(1),
+  gates: z.array(EvalGateSchema)
+});
+
+export const EvalRunEventSchema = z.object({
+  id: z.string().min(1),
+  at: z.string().datetime(),
+  level: z.enum(["info", "success", "warning", "error"]),
+  message: z.string().min(1),
+  nodeId: z.string().optional()
+});
+
+export const EvalRunSummarySchema = z.object({
+  artifactCount: z.number().int().nonnegative(),
+  approvedArtifactCount: z.number().int().nonnegative(),
+  estimatedCostUsd: z.number().nonnegative(),
+  taskCount: z.number().int().nonnegative(),
+  averageQuality: z.number(),
+  safetyPassRate: z.number(),
+  p95LatencyMs: z.number().nonnegative(),
+  bestModel: z.string().min(1)
+});
+
+export const EvalRunRecordSchema = z.object({
+  id: z.string().min(1),
+  createdAt: z.string().datetime(),
+  status: EvalRunStatusSchema,
+  spec: EvalRunSpecSchema,
+  summary: EvalRunSummarySchema,
+  jobs: z.array(ImageGenerationJobSchema),
+  artifacts: z.array(ImageArtifactSchema),
+  scores: z.array(ImageScoreSchema),
+  reviews: z.array(HumanReviewSchema),
+  pairwise: z.array(PairwiseComparisonSchema),
+  modelSummaries: z.array(ModelSummarySchema),
+  pareto: z.array(ParetoPointSchema),
+  decision: EvalDecisionSchema,
+  events: z.array(EvalRunEventSchema)
+});
+
+export type ImageProvider = z.infer<typeof ImageProviderSchema>;
+export type ImageMetric = z.infer<typeof ImageMetricSchema>;
+export type ReviewVerdict = z.infer<typeof ReviewVerdictSchema>;
+export type EvalRunStatus = z.infer<typeof EvalRunStatusSchema>;
+export type ImageGenerationJob = z.infer<typeof ImageGenerationJobSchema>;
+export type ImageArtifact = z.infer<typeof ImageArtifactSchema>;
+export type ImageScore = z.infer<typeof ImageScoreSchema>;
+export type HumanReview = z.infer<typeof HumanReviewSchema>;
+export type PairwiseComparison = z.infer<typeof PairwiseComparisonSchema>;
+export type ModelSummary = z.infer<typeof ModelSummarySchema>;
+export type ParetoPoint = z.infer<typeof ParetoPointSchema>;
+export type EvalDecision = z.infer<typeof EvalDecisionSchema>;
+export type EvalRunEvent = z.infer<typeof EvalRunEventSchema>;
+export type EvalRunSummary = z.infer<typeof EvalRunSummarySchema>;
+export type EvalRunRecord = z.infer<typeof EvalRunRecordSchema>;
+
 export function getNodeDefinition(type: string): EvalNodeDefinition | undefined {
   return nodeDefinitionMap.get(type);
 }
@@ -464,9 +645,10 @@ export const starterWorkflowDraft = {
         label: "Model Fanout",
         status: "idle",
         config: {
-          models: ["gpt-image", "imagen", "flux"],
+          models: ["gpt-image", "imagen", "flux", "sdxl"],
           samplesPerPrompt: 2,
-          seedStrategy: "fixed_by_prompt"
+          seedStrategy: "fixed_by_prompt",
+          budgetUsd: 50
         }
       }
     },
@@ -491,7 +673,17 @@ export const starterWorkflowDraft = {
         label: "Auto Metrics",
         status: "idle",
         config: {
-          metrics: ["ocr", "safety", "imagereward", "pickscore"]
+          metrics: [
+            "vlm_rubric",
+            "clip_siglip",
+            "ocr",
+            "nsfw",
+            "blur",
+            "aesthetic",
+            "cost",
+            "latency"
+          ],
+          budgetUsd: 12
         }
       }
     },

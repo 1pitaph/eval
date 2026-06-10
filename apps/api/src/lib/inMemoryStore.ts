@@ -1,19 +1,6 @@
 import { nanoid } from "nanoid";
-import type { EvalRunSpec, WorkflowDraft } from "@eval/workflow-schema";
-
-export type EvalRunStatus = "queued" | "running" | "succeeded" | "failed";
-
-export type EvalRunRecord = {
-  id: string;
-  createdAt: string;
-  spec: EvalRunSpec;
-  status: EvalRunStatus;
-  summary: {
-    artifactCount: number;
-    estimatedCostUsd: number;
-    taskCount: number;
-  };
-};
+import type { EvalRunRecord, EvalRunSpec, WorkflowDraft } from "@eval/workflow-schema";
+import { runImageEvalSpec } from "../services/imageEvalRunner";
 
 const workflows = new Map<string, WorkflowDraft & { id: string }>();
 const runs = new Map<string, EvalRunRecord>();
@@ -34,25 +21,16 @@ export function listWorkflows() {
 }
 
 export function saveRun(spec: EvalRunSpec): EvalRunRecord {
-  const generationNodes = spec.nodes.filter(
-    (node) => node.runtime === "generation"
-  ).length;
-  const metricNodes = spec.nodes.filter((node) => node.runtime === "metric").length;
   const id = nanoid();
-  const record: EvalRunRecord = {
-    id,
-    createdAt: new Date().toISOString(),
-    spec,
-    status: "queued",
-    summary: {
-      artifactCount: generationNodes * 100,
-      estimatedCostUsd: generationNodes * 12 + metricNodes * 2,
-      taskCount: spec.nodes.length + spec.edges.length
-    }
-  };
+  const record = runImageEvalSpec(spec, id, new Date().toISOString());
 
   runs.set(id, record);
   return record;
+}
+
+export function saveImportedRun(run: EvalRunRecord) {
+  runs.set(run.id, run);
+  return run;
 }
 
 export function getRun(id: string) {

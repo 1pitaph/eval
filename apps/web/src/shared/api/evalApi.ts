@@ -1,4 +1,4 @@
-import type { EvalRunSpec, WorkflowDraft } from "@eval/workflow-schema";
+import type { EvalRunRecord, EvalRunSpec, WorkflowDraft } from "@eval/workflow-schema";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "/api";
 
@@ -15,16 +15,7 @@ export type CompileResponse =
 
 export type RunResponse =
   | {
-      run: {
-        id: string;
-        createdAt: string;
-        status: string;
-        summary: {
-          artifactCount: number;
-          estimatedCostUsd: number;
-          taskCount: number;
-        };
-      };
+      run: EvalRunRecord;
       warnings: Array<{ code: string; message: string; nodeId?: string }>;
     }
   | CompileResponse;
@@ -52,4 +43,8 @@ export function compileWorkflow(draft: WorkflowDraft) {
 
 export function startRun(draft: WorkflowDraft) {
   return postJson<RunResponse>("/runs", draft);
+}
+
+export function exportRunUrl(runId: string, format: "csv" | "json") {
+  return `${API_BASE_URL}/runs/${runId}/export.${format}`;
 }

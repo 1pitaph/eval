@@ -3,6 +3,7 @@ import { Braces, CircleDollarSign, GitBranch, Play } from "lucide-react";
 import { Badge, Button } from "@eval/ui";
 import { InspectorPanel } from "../features/workflow/components/InspectorPanel";
 import { NodePalette } from "../features/workflow/components/NodePalette";
+import { ResultsWorkbench } from "../features/workflow/components/ResultsWorkbench";
 import { RunPanel } from "../features/workflow/components/RunPanel";
 import { WorkflowCanvas } from "../features/workflow/components/WorkflowCanvas";
 import { compileWorkflow, startRun } from "../shared/api/evalApi";
@@ -60,6 +61,7 @@ export function App() {
           </section>
           <InspectorPanel />
           <RunPanel />
+          <ResultsWorkbench />
         </main>
       </div>
     </ReactFlowProvider>
