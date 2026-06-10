@@ -114,6 +114,21 @@ textarea {
   overflow: hidden;
 }
 
+.canvas-shell--tool-select .react-flow__pane,
+.canvas-shell--tool-select .react-flow__selectionpane {
+  cursor: default;
+}
+
+.canvas-shell--tool-pan .react-flow__pane,
+.canvas-shell--tool-pan .react-flow__selectionpane {
+  cursor: grab;
+}
+
+.canvas-shell--tool-pan .react-flow__pane:active,
+.canvas-shell--tool-pan .react-flow__selectionpane:active {
+  cursor: grabbing;
+}
+
 .ui-panel {
   background: #ffffff;
   border: 1px solid #d9e0e7;

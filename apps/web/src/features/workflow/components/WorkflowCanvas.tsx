@@ -25,6 +25,7 @@ import {
   type NodeCategory
 } from "@eval/workflow-schema";
 import { Badge } from "@eval/ui";
+import { getCanvasToolClassName } from "../config/canvasTools";
 import {
   type EvalFlowEdge,
   type EvalFlowNode,
@@ -124,7 +125,10 @@ export function WorkflowCanvas() {
   );
 
   return (
-    <section className="canvas-shell" aria-label="Workflow canvas">
+    <section
+      className={`canvas-shell ${getCanvasToolClassName(canvasTool)}`}
+      aria-label="Workflow canvas"
+    >
       <ReactFlow
         colorMode="light"
         defaultEdgeOptions={defaultEdgeOptions}

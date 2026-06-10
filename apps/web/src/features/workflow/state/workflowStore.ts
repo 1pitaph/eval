@@ -16,12 +16,12 @@ import {
   type WorkflowDraft,
   type WorkflowNodeData
 } from "@eval/workflow-schema";
+import type { CanvasTool } from "../config/canvasTools";
 import type { CompileResponse, RunResponse } from "../../../shared/api/evalApi";
 
 export type EvalFlowNodeData = WorkflowNodeData & Record<string, unknown>;
 export type EvalFlowNode = Node<EvalFlowNodeData, string>;
 export type EvalFlowEdge = Edge;
-export type CanvasTool = "select" | "pan";
 
 type WorkflowState = {
   canvasTool: CanvasTool;
