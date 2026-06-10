@@ -2,7 +2,6 @@ import { ReactFlowProvider } from "@xyflow/react";
 import { Braces, CircleDollarSign, GitBranch, Play } from "lucide-react";
 import { Badge, Button } from "@eval/ui";
 import { InspectorPanel } from "../features/workflow/components/InspectorPanel";
-import { NodePalette } from "../features/workflow/components/NodePalette";
 import { ResultsWorkbench } from "../features/workflow/components/ResultsWorkbench";
 import { RunPanel } from "../features/workflow/components/RunPanel";
 import { WorkflowCanvas } from "../features/workflow/components/WorkflowCanvas";
@@ -66,7 +65,6 @@ function StudioApp() {
 
         <main className="studio-grid">
           <section className="canvas-stage" aria-label="Workflow builder">
-            <NodePalette />
             <WorkflowCanvas />
           </section>
           <InspectorPanel />
