@@ -7,6 +7,7 @@ import {
   type EvalRunSpec,
   type WorkflowDraft
 } from "@eval/workflow-schema";
+import { buildEvalManifest } from "./evalManifest";
 
 export type CompileIssue = {
   code: string;
@@ -39,11 +40,13 @@ export function compileWorkflow(input: unknown): CompileResult {
   }
 
   const topologicalOrder = sortTopologically(draft);
+  const compiledAt = new Date().toISOString();
   const spec: EvalRunSpec = {
     workflowId: draft.id ?? "unsaved-workflow",
     workflowVersion: draft.version,
     name: draft.name,
-    compiledAt: new Date().toISOString(),
+    compiledAt,
+    manifest: buildEvalManifest(draft, compiledAt),
     topologicalOrder,
     edges: draft.edges,
     nodes: draft.nodes.map((node) => {

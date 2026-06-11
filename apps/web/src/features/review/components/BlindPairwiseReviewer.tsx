@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import type { PairwiseVoteChoice, ReviewReasonTag } from "@eval/workflow-schema";
-import { Badge, Button } from "@eval/ui";
+import { Badge, Button, TextArea, TextInput } from "@eval/ui";
 import {
   createReviewerSession,
   getReviewerSessionTasks,
@@ -205,7 +205,7 @@ export function BlindPairwiseReviewer({ token }: { token: string }) {
           </p>
           <label>
             Display name
-            <input
+            <TextInput
               autoFocus
               onChange={(event) => setDisplayName(event.target.value)}
               placeholder="Reviewer"
@@ -301,18 +301,20 @@ export function BlindPairwiseReviewer({ token }: { token: string }) {
 
           <div className="blind-reason-tags">
             {reasonTagOptions.map((tag) => (
-              <button
+              <Button
                 className={reasonTags.includes(tag.value) ? "is-selected" : ""}
                 key={tag.value}
                 onClick={() => toggleReasonTag(tag.value)}
+                size="sm"
                 type="button"
+                variant={reasonTags.includes(tag.value) ? "primary" : "ghost"}
               >
                 {tag.label}
-              </button>
+              </Button>
             ))}
           </div>
 
-          <textarea
+          <TextArea
             onChange={(event) => setComment(event.target.value)}
             placeholder="Optional note"
             value={comment}
@@ -372,10 +374,16 @@ function VoteButton({
   onClick: () => void;
 }) {
   return (
-    <button className={active ? "is-selected" : ""} onClick={onClick} type="button">
+    <Button
+      className={active ? "is-selected" : ""}
+      onClick={onClick}
+      size="sm"
+      type="button"
+      variant={active ? "primary" : "ghost"}
+    >
       {icon}
       {label}
-    </button>
+    </Button>
   );
 }
 

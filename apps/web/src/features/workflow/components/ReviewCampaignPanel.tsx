@@ -1,7 +1,7 @@
 import { Check, Clipboard, Link2, RefreshCcw, Send, Users } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import type { EvalRunRecord } from "@eval/workflow-schema";
-import { Badge, Button } from "@eval/ui";
+import { Badge, Button, TextInput } from "@eval/ui";
 import {
   aggregateReviewCampaign,
   createReviewCampaign,
@@ -160,7 +160,7 @@ export function ReviewCampaignPanel({
       <div className="review-campaign-panel__form">
         <label>
           Campaign
-          <input
+          <TextInput
             onChange={(event) =>
               setDraft((state) => ({ ...state, name: event.target.value }))
             }
@@ -169,7 +169,7 @@ export function ReviewCampaignPanel({
         </label>
         <label>
           Votes/task
-          <input
+          <TextInput
             min="1"
             max="9"
             onChange={(event) =>
@@ -184,7 +184,7 @@ export function ReviewCampaignPanel({
         </label>
         <label>
           Tasks
-          <input
+          <TextInput
             min="1"
             max="200"
             onChange={(event) =>
@@ -196,7 +196,7 @@ export function ReviewCampaignPanel({
         </label>
         <label>
           Link uses
-          <input
+          <TextInput
             min="1"
             max="1000"
             onChange={(event) =>
@@ -219,7 +219,7 @@ export function ReviewCampaignPanel({
       {latestLink ? (
         <div className="review-link-banner">
           <Link2 aria-hidden="true" size={15} />
-          <input readOnly value={latestLink} />
+          <TextInput readOnly value={latestLink} />
           <Button onClick={() => handleCopy(latestLink)} type="button" variant="ghost">
             {copiedLink === latestLink ? (
               <Check aria-hidden="true" size={14} />

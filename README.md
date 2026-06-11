@@ -30,6 +30,24 @@ pnpm lint
 pnpm build
 ```
 
+## Config-as-Code Runner
+
+Eval Studio compiles the canvas into an `EvalRunSpec` with an
+`image-eval-manifest/v1` manifest. Runs can export:
+
+- `export.json`: full run result package.
+- `spec.json`: executable workflow spec for replay.
+- `manifest.json`: lightweight input matrix, cost, and review plan.
+
+CI can run a workflow draft, spec, manifest, or exported run JSON without the web
+UI:
+
+```bash
+pnpm --filter @eval/api eval:run -- \
+  --input ./eval-spec.json \
+  --output ./eval-run.json
+```
+
 ## Architecture Contract
 
 React Flow stores a visual draft. The backend compiles that draft into an

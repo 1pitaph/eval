@@ -1,3 +1,8 @@
+import {
+  PromptCaseSchema,
+  ReferenceImageSchema,
+  type ReferenceImage
+} from "@eval/workflow-schema";
 import type {
   EvalDecision,
   EvalRunEvent,
@@ -18,6 +23,7 @@ type PromptFixture = {
   id: string;
   prompt: string;
   expectedText: string;
+  referenceImages?: ReferenceImage[];
   tags: string[];
 };
 
@@ -144,10 +150,7 @@ export function runImageEvalSpec(
 
   const datasetId = stringConfig(datasetConfig.datasetId, "golden-image-prompts-v1");
   const sampleLimit = numberConfig(datasetConfig.sampleLimit, 4);
-  const prompts = (promptSuites[datasetId] ?? defaultPromptSuite).slice(
-    0,
-    clamp(Math.round(sampleLimit), 1, 8)
-  );
+  const prompts = resolvePrompts(datasetConfig, datasetId, sampleLimit);
   const template = stringConfig(promptTemplateConfig.template, "{{prompt}}");
   const negativePrompt = stringConfig(
     promptTemplateConfig.negativePrompt,
@@ -197,6 +200,9 @@ export function runImageEvalSpec(
             width: 1024,
             height: 1024,
             negativePrompt,
+            ...(prompt.referenceImages?.length
+              ? { referenceImages: prompt.referenceImages }
+              : {}),
             quality: provider === "openai" ? "high" : "standard",
             seedStrategy: stringConfig(generationConfig.seedStrategy, "fixed_by_prompt")
           },
@@ -286,6 +292,54 @@ export function runImageEvalSpec(
 
 function getNodeConfig(spec: EvalRunSpec, type: string) {
   return spec.nodes.find((node) => node.type === type)?.config ?? {};
+}
+
+function resolvePrompts(
+  datasetConfig: Record<string, unknown>,
+  datasetId: string,
+  sampleLimit: number
+): PromptFixture[] {
+  const inlinePrompts = promptCasesConfig(datasetConfig.inlinePrompts);
+  const sharedReferenceImages = referenceImagesConfig(datasetConfig.referenceImages);
+  const limit = clamp(Math.round(sampleLimit), 1, 200);
+
+  if (datasetConfig.mode === "inline" || inlinePrompts.length > 0) {
+    const prompts = inlinePrompts.length > 0 ? inlinePrompts : defaultPromptSuite;
+    return prompts.slice(0, limit).map((prompt, index) => ({
+      id: prompt.id || `inline-prompt-${index + 1}`,
+      prompt: prompt.prompt,
+      expectedText: prompt.expectedText ?? "",
+      referenceImages: [
+        ...sharedReferenceImages,
+        ...(prompt.referenceImages ?? [])
+      ].slice(0, 12),
+      tags: prompt.tags.length > 0 ? prompt.tags : ["inline"]
+    }));
+  }
+
+  return (promptSuites[datasetId] ?? defaultPromptSuite).slice(0, clamp(limit, 1, 8));
+}
+
+function promptCasesConfig(value: unknown) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .map((candidate) => PromptCaseSchema.safeParse(candidate))
+    .filter((result) => result.success)
+    .map((result) => result.data);
+}
+
+function referenceImagesConfig(value: unknown) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .map((candidate) => ReferenceImageSchema.safeParse(candidate))
+    .filter((result) => result.success)
+    .map((result) => result.data);
 }
 
 function stringConfig(value: unknown, fallback: string) {
@@ -614,8 +668,13 @@ function buildSummary(
   return {
     artifactCount: artifacts.length,
     approvedArtifactCount: reviews.filter((review) => review.verdict === "pass").length,
-    estimatedCostUsd: roundCurrency(sum(artifacts.map((artifact) => artifact.costUsd))),
-    taskCount: spec.nodes.length + spec.edges.length + artifacts.length + scores.length,
+    estimatedCostUsd: roundCurrency(
+      Math.max(
+        sum(artifacts.map((artifact) => artifact.costUsd)),
+        spec.manifest.matrix.estimatedCostUsd
+      )
+    ),
+    taskCount: spec.manifest.matrix.totalPlannedOperations,
     averageQuality: roundScore(
       average(artifacts.map((artifact) => qualityForArtifact(artifact.id, scores)))
     ),

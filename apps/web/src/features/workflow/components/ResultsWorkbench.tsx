@@ -4,6 +4,7 @@ import {
   Eye,
   FileInput,
   GalleryVerticalEnd,
+  GitBranch,
   GitCompareArrows,
   ThumbsDown,
   ThumbsUp,
@@ -13,6 +14,7 @@ import { useMemo, useRef, useState, type Dispatch, type SetStateAction } from "r
 import {
   type EvalRunRecord,
   type EvalRunSpec,
+  type EvalSpecManifest,
   type HumanReview,
   type ImageArtifact,
   type ImageProvider,
@@ -20,8 +22,24 @@ import {
   type PairwiseComparison,
   type ReviewVerdict
 } from "@eval/workflow-schema";
-import { Badge, Button, Panel } from "@eval/ui";
-import { exportRunUrl } from "../../../shared/api/evalApi";
+import {
+  Badge,
+  Button,
+  ButtonLink,
+  CheckboxControl,
+  Dialog,
+  DialogPopup,
+  DialogTitle,
+  Panel,
+  SelectControl,
+  Slider,
+  TextArea
+} from "@eval/ui";
+import {
+  exportRunManifestUrl,
+  exportRunSpecUrl,
+  exportRunUrl
+} from "../../../shared/api/evalApi";
 import { useWorkflowStore } from "../state/workflowStore";
 import { ReviewCampaignPanel } from "./ReviewCampaignPanel";
 
@@ -45,6 +63,11 @@ const tabLabels: Record<WorkbenchTab, string> = {
 
 export function ResultsWorkbench() {
   const runResult = useWorkflowStore((state) => state.runResult);
+  const loadWorkflowFromManifest = useWorkflowStore(
+    (state) => state.loadWorkflowFromManifest
+  );
+  const loadWorkflowFromSpec = useWorkflowStore((state) => state.loadWorkflowFromSpec);
+  const setCanvasOpen = useWorkflowStore((state) => state.setCanvasOpen);
   const setRunResult = useWorkflowStore((state) => state.setRunResult);
   const run = runResult && "run" in runResult ? runResult.run : undefined;
   const [activeTab, setActiveTab] = useState<WorkbenchTab>("gallery");
@@ -80,10 +103,23 @@ export function ResultsWorkbench() {
 
   const handleImport = async (file: File) => {
     const text = await file.text();
-    const importedRun =
-      file.name.toLowerCase().endsWith(".csv") || text.trimStart().startsWith("run_id,")
-        ? importPromptfooCsv(text)
-        : importPromptfooJson(text);
+    if (!isCsvImport(file.name, text)) {
+      const configPayload = JSON.parse(text) as unknown;
+      if (isEvalRunSpecPayload(configPayload)) {
+        loadWorkflowFromSpec(configPayload);
+        setCanvasOpen(true);
+        return;
+      }
+      if (isEvalManifestPayload(configPayload)) {
+        loadWorkflowFromManifest(configPayload);
+        setCanvasOpen(true);
+        return;
+      }
+    }
+
+    const importedRun = isCsvImport(file.name, text)
+      ? importPromptfooCsv(text)
+      : importPromptfooJson(text);
     setRunResult({ run: importedRun, warnings: [] });
     setActiveTab("gallery");
     setSelectedModel("all");
@@ -107,6 +143,10 @@ export function ResultsWorkbench() {
             ref={fileInputRef}
             type="file"
           />
+          <Button onClick={() => setCanvasOpen(true)} type="button" variant="secondary">
+            <GitBranch aria-hidden="true" size={14} />
+            Open Canvas
+          </Button>
           <Button
             onClick={() => fileInputRef.current?.click()}
             type="button"
@@ -117,20 +157,22 @@ export function ResultsWorkbench() {
           </Button>
           {run ? (
             <>
-              <a
-                className="ui-button ui-button--ghost"
-                href={exportRunUrl(run.id, "csv")}
-              >
+              <ButtonLink href={exportRunUrl(run.id, "csv")} variant="ghost">
                 <Download aria-hidden="true" size={14} />
                 CSV
-              </a>
-              <a
-                className="ui-button ui-button--ghost"
-                href={exportRunUrl(run.id, "json")}
-              >
+              </ButtonLink>
+              <ButtonLink href={exportRunUrl(run.id, "json")} variant="ghost">
                 <Download aria-hidden="true" size={14} />
                 JSON
-              </a>
+              </ButtonLink>
+              <ButtonLink href={exportRunManifestUrl(run.id)} variant="ghost">
+                <Download aria-hidden="true" size={14} />
+                Manifest
+              </ButtonLink>
+              <ButtonLink href={exportRunSpecUrl(run.id)} variant="ghost">
+                <Download aria-hidden="true" size={14} />
+                Spec
+              </ButtonLink>
             </>
           ) : null}
         </div>
@@ -143,7 +185,7 @@ export function ResultsWorkbench() {
           <GalleryVerticalEnd aria-hidden="true" size={34} />
           <div>
             <h3>No image run yet</h3>
-            <p>Run the canvas workflow or import Promptfoo JSON/CSV results.</p>
+            <p>Run the canvas workflow or import results, run specs, or manifests.</p>
           </div>
         </div>
       ) : (
@@ -172,43 +214,41 @@ export function ResultsWorkbench() {
             <div className="segmented-control" role="tablist">
               {(["gallery", "compare", "pareto", "human"] as WorkbenchTab[]).map(
                 (tab) => (
-                  <button
+                  <Button
                     aria-selected={activeTab === tab}
                     className={activeTab === tab ? "is-active" : ""}
                     key={tab}
                     onClick={() => setActiveTab(tab)}
                     role="tab"
+                    size="sm"
                     type="button"
+                    variant={activeTab === tab ? "primary" : "ghost"}
                   >
                     {tabIcon(tab)}
                     {tabLabels[tab]}
-                  </button>
+                  </Button>
                 )
               )}
             </div>
             <div className="results-filters">
               <label>
                 Model
-                <select
+                <SelectControl
+                  options={[
+                    { label: "All models", value: "all" },
+                    ...models.map((model) => ({ label: model, value: model }))
+                  ]}
                   value={selectedModel}
-                  onChange={(event) => setSelectedModel(event.target.value)}
-                >
-                  <option value="all">All models</option>
-                  {models.map((model) => (
-                    <option key={model} value={model}>
-                      {model}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="checkbox-control">
-                <input
-                  checked={onlyApproved}
-                  onChange={(event) => setOnlyApproved(event.target.checked)}
-                  type="checkbox"
+                  onValueChange={setSelectedModel}
                 />
-                Approved only
               </label>
+              <CheckboxControl
+                checked={onlyApproved}
+                className="checkbox-control"
+                onCheckedChange={setOnlyApproved}
+              >
+                Approved only
+              </CheckboxControl>
             </div>
           </div>
 
@@ -347,16 +387,14 @@ function CompareTab({
     <div className="compare-tab">
       <label className="compare-tab__selector">
         Prompt task
-        <select
+        <SelectControl
+          options={run.pairwise.map((task) => ({
+            label: task.promptId,
+            value: task.id
+          }))}
           value={comparison.id}
-          onChange={(event) => setSelectedPairwiseId(event.target.value)}
-        >
-          {run.pairwise.map((task) => (
-            <option key={task.id} value={task.id}>
-              {task.promptId}
-            </option>
-          ))}
-        </select>
+          onValueChange={setSelectedPairwiseId}
+        />
       </label>
       <div className="compare-grid">
         <CompareArtifact
@@ -533,19 +571,31 @@ function ArtifactLightbox({
 }) {
   const scores = run.scores.filter((score) => score.artifactId === artifact.id);
   return (
-    <div className="lightbox-backdrop" role="presentation" onClick={onClose}>
-      <dialog
+    <Dialog
+      open
+      onOpenChange={(open) => {
+        if (!open) {
+          onClose();
+        }
+      }}
+    >
+      <DialogPopup
+        bottomStickOnMobile={false}
         className="artifact-lightbox"
-        onClick={(event) => event.stopPropagation()}
-        open
+        showCloseButton={false}
       >
-        <button className="lightbox-close" onClick={onClose} type="button">
+        <Button
+          className="lightbox-close"
+          onClick={onClose}
+          type="button"
+          variant="secondary"
+        >
           Close
-        </button>
+        </Button>
         <img alt={`${artifact.model} full result`} src={artifact.uri} />
         <div className="artifact-lightbox__details">
           <div>
-            <h3>{artifact.model}</h3>
+            <DialogTitle>{artifact.model}</DialogTitle>
             <p>{artifact.prompt}</p>
             <dl>
               <div>
@@ -580,8 +630,8 @@ function ArtifactLightbox({
             setReviewDrafts={setReviewDrafts}
           />
         </div>
-      </dialog>
-    </div>
+      </DialogPopup>
+    </Dialog>
   );
 }
 
@@ -609,49 +659,57 @@ function ReviewControl({
   return (
     <div className={`review-control ${compact ? "review-control--compact" : ""}`}>
       <div className="review-control__buttons">
-        <button
+        <Button
           className={review.verdict === "pass" ? "is-selected" : ""}
           onClick={() =>
             update({ verdict: "pass", score: Math.max(review.score, 0.82) })
           }
+          size="sm"
           type="button"
+          variant={review.verdict === "pass" ? "primary" : "ghost"}
         >
           <ThumbsUp aria-hidden="true" size={13} />
           Pass
-        </button>
-        <button
+        </Button>
+        <Button
           className={review.verdict === "needs_review" ? "is-selected" : ""}
           onClick={() => update({ verdict: "needs_review", score: 0.68 })}
+          size="sm"
           type="button"
+          variant={review.verdict === "needs_review" ? "primary" : "ghost"}
         >
           <Eye aria-hidden="true" size={13} />
           Review
-        </button>
-        <button
+        </Button>
+        <Button
           className={review.verdict === "fail" ? "is-selected" : ""}
           onClick={() =>
             update({ verdict: "fail", score: Math.min(review.score, 0.45) })
           }
+          size="sm"
           type="button"
+          variant={review.verdict === "fail" ? "primary" : "ghost"}
         >
           <ThumbsDown aria-hidden="true" size={13} />
           Fail
-        </button>
+        </Button>
       </div>
       {!compact ? (
         <>
           <label>
             Score {percent(review.score)}
-            <input
-              max="1"
-              min="0"
-              onChange={(event) => update({ score: Number(event.target.value) })}
-              step="0.01"
-              type="range"
+            <Slider
+              className="review-score-slider"
+              max={1}
+              min={0}
+              onValueChange={(value) =>
+                update({ score: Array.isArray(value) ? value[0] : value })
+              }
+              step={0.01}
               value={review.score}
             />
           </label>
-          <textarea
+          <TextArea
             onChange={(event) => update({ comment: event.target.value })}
             placeholder="Review comment"
             value={review.comment}
@@ -775,6 +833,33 @@ function importPromptfooJson(text: string): EvalRunRecord {
   return buildImportedRun(rows);
 }
 
+function isCsvImport(fileName: string, text: string) {
+  return (
+    fileName.toLowerCase().endsWith(".csv") || text.trimStart().startsWith("run_id,")
+  );
+}
+
+function isEvalRunSpecPayload(payload: unknown): payload is EvalRunSpec {
+  return (
+    isRecord(payload) &&
+    typeof payload.workflowId === "string" &&
+    typeof payload.workflowVersion === "number" &&
+    isEvalManifestPayload(payload.manifest) &&
+    Array.isArray(payload.nodes) &&
+    Array.isArray(payload.edges)
+  );
+}
+
+function isEvalManifestPayload(payload: unknown): payload is EvalSpecManifest {
+  return (
+    isRecord(payload) &&
+    payload.version === "image-eval-manifest/v1" &&
+    isRecord(payload.input) &&
+    isRecord(payload.matrix) &&
+    isRecord(payload.humanReview)
+  );
+}
+
 function importPromptfooCsv(text: string): EvalRunRecord {
   const [headerRow, ...rows] = parseCsv(text.trim());
   const headers = headerRow ?? [];
@@ -825,7 +910,7 @@ function extractPromptfooRows(payload: unknown): Array<Record<string, unknown>> 
 function buildImportedRun(rows: Array<Record<string, unknown>>): EvalRunRecord {
   const createdAt = new Date().toISOString();
   const runId = `imported-${Date.now()}`;
-  const spec = importedSpec(createdAt);
+  const spec = importedSpec(createdAt, rows.length);
   const artifacts = rows.slice(0, 200).map((row, index): ImageArtifact => {
     const provider = normalizeProvider(readString(row, ["provider", "providerId"]));
     const model = readString(row, ["model", "modelName", "provider"]) || provider;
@@ -1014,12 +1099,80 @@ function buildImportedRun(rows: Array<Record<string, unknown>>): EvalRunRecord {
   };
 }
 
-function importedSpec(compiledAt: string): EvalRunSpec {
+function importedSpec(compiledAt: string, rowCount: number): EvalRunSpec {
   return {
     workflowId: "promptfoo-import",
     workflowVersion: 1,
     name: "Promptfoo import",
     compiledAt,
+    manifest: {
+      version: "image-eval-manifest/v1",
+      configFormat: "eval-studio-json",
+      generatedAt: compiledAt,
+      input: {
+        datasetId: "promptfoo-import",
+        promptMode: "inline",
+        sampleLimit: Math.max(rowCount, 1),
+        promptCount: rowCount,
+        referenceImageCount: 0,
+        template: "Imported Promptfoo rows",
+        templatePreview: "Imported Promptfoo rows"
+      },
+      providers: [],
+      metrics: ["vlm_rubric", "nsfw", "cost", "latency"],
+      humanReview: {
+        enabled: false,
+        mode: "pairwise",
+        blindMode: true,
+        sampleRate: 0,
+        reviewersPerTask: 1,
+        estimatedTasks: 0,
+        estimatedVotes: 0
+      },
+      aggregation: {
+        rankingMethod: "imported-score",
+        releaseGate: {
+          baselineRunId: "promptfoo-import",
+          minHumanWinRate: 0.5,
+          maxCostIncreasePct: 0,
+          safetyMustPass: true
+        }
+      },
+      runtime: {
+        maxConcurrency: 1,
+        repeat: 1,
+        cache: true,
+        seedStrategy: "imported"
+      },
+      matrix: {
+        promptCount: rowCount,
+        modelCount: 0,
+        samplesPerPrompt: 1,
+        generationJobs: rowCount,
+        metricChecks: rowCount * 4,
+        humanReviewTasks: 0,
+        totalPlannedOperations: rowCount * 5,
+        estimatedGenerationCostUsd: 0,
+        estimatedMetricCostUsd: 0,
+        estimatedHumanReviewCostUsd: 0,
+        estimatedCostUsd: 0,
+        estimatedProviderLatencyMs: 0
+      },
+      issues: [
+        {
+          severity: "info",
+          code: "imported_promptfoo_results",
+          message:
+            "This run was imported from Promptfoo-style output, so the original eval graph is not available."
+        }
+      ],
+      exportHints: {
+        configAsCode: true,
+        ciRunnable: true,
+        secretsPolicy:
+          "Imported result payloads should not contain raw provider secrets."
+      }
+    },
     topologicalOrder: [],
     nodes: [],
     edges: []
@@ -1193,8 +1346,8 @@ function importedImageUri(provider: ImageProvider, model: string, promptId: stri
     <rect width="1024" height="1024" fill="#f8fafc"/>
     <rect x="168" y="232" width="688" height="560" rx="48" fill="#ffffff" stroke="#cbd5e1"/>
     <circle cx="350" cy="420" r="116" fill="#dbeafe"/>
-    <rect x="462" y="354" width="248" height="132" rx="28" fill="#0f766e"/>
-    <text x="512" y="610" text-anchor="middle" font-family="Inter, Arial, sans-serif" font-size="52" font-weight="800" fill="#172026">${label}</text>
+    <rect x="462" y="354" width="248" height="132" rx="28" fill="#18181b"/>
+    <text x="512" y="610" text-anchor="middle" font-family="Inter, Arial, sans-serif" font-size="52" font-weight="800" fill="#18181b">${label}</text>
     <text x="512" y="690" text-anchor="middle" font-family="Inter, Arial, sans-serif" font-size="28" font-weight="700" fill="#64748b">${promptId}</text>
   </svg>`;
   return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;

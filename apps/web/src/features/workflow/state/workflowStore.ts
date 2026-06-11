@@ -12,6 +12,8 @@ import {
 import { create } from "zustand";
 import {
   getNodeDefinition,
+  type EvalRunSpec,
+  type EvalSpecManifest,
   starterWorkflowDraft,
   type WorkflowDraft,
   type WorkflowNodeData
@@ -26,19 +28,25 @@ export type EvalFlowEdge = Edge;
 type WorkflowState = {
   canvasTool: CanvasTool;
   compileResult: CompileResponse | undefined;
+  description: string | undefined;
   edges: EvalFlowEdge[];
+  isCanvasOpen: boolean;
+  name: string;
   nodes: EvalFlowNode[];
   runResult: RunResponse | undefined;
   selectedNodeId: string | undefined;
+  version: number;
   viewport: Viewport | undefined;
-  addNode: (type: string) => void;
-  addNodeAt: (type: string, position?: { x: number; y: number }) => void;
+  loadWorkflowDraft: (draft: WorkflowDraft) => void;
+  loadWorkflowFromManifest: (manifest: EvalSpecManifest) => void;
+  loadWorkflowFromSpec: (spec: EvalRunSpec) => void;
   onConnect: (connection: Connection) => void;
   onEdgesChange: (changes: EdgeChange<EvalFlowEdge>[]) => void;
   onNodesChange: (changes: NodeChange<EvalFlowNode>[]) => void;
   selectNode: (nodeId?: string) => void;
   setCompileResult: (result: CompileResponse) => void;
   setCanvasTool: (tool: CanvasTool) => void;
+  setCanvasOpen: (open: boolean) => void;
   setRunResult: (result: RunResponse) => void;
   setViewport: (viewport: Viewport) => void;
   toDraft: () => WorkflowDraft;
@@ -53,45 +61,46 @@ const initialNodes = starterWorkflowDraft.nodes.map((node) => ({
   }
 })) satisfies EvalFlowNode[];
 
-const initialEdges = starterWorkflowDraft.edges satisfies EvalFlowEdge[];
+const initialEdges = flowEdgesFromDraft(starterWorkflowDraft.edges);
 
 export const useWorkflowStore = create<WorkflowState>((set, get) => ({
   canvasTool: "select",
+  description: starterWorkflowDraft.description,
   edges: initialEdges,
+  isCanvasOpen: false,
+  name: starterWorkflowDraft.name,
   nodes: initialNodes,
   compileResult: undefined,
   runResult: undefined,
   selectedNodeId: initialNodes[0]?.id,
+  version: starterWorkflowDraft.version,
   viewport: undefined,
-  addNode: (type) => {
-    get().addNodeAt(type);
-  },
-  addNodeAt: (type, position) => {
-    const definition = getNodeDefinition(type);
-    if (!definition) {
-      return;
-    }
-
-    const index = get().nodes.length;
-    const id = `${type}-${Date.now()}`;
-    const node: EvalFlowNode = {
-      id,
-      type,
-      position: {
-        x: position?.x ?? 120 + (index % 4) * 280,
-        y: position?.y ?? 120 + Math.floor(index / 4) * 180
-      },
+  loadWorkflowDraft: (draft) => {
+    const nodes = draft.nodes.map((node) => ({
+      ...node,
       data: {
-        label: definition.title,
-        config: {},
-        status: "idle"
+        ...node.data,
+        config: node.data.config
       }
-    };
+    })) satisfies EvalFlowNode[];
 
-    set((state) => ({
-      nodes: [...state.nodes, node],
-      selectedNodeId: id
-    }));
+    set({
+      compileResult: undefined,
+      description: draft.description,
+      edges: flowEdgesFromDraft(draft.edges),
+      name: draft.name,
+      nodes,
+      runResult: undefined,
+      selectedNodeId: nodes[0]?.id,
+      version: draft.version,
+      viewport: draft.viewport
+    });
+  },
+  loadWorkflowFromManifest: (manifest) => {
+    get().loadWorkflowDraft(draftFromManifest(manifest));
+  },
+  loadWorkflowFromSpec: (spec) => {
+    get().loadWorkflowDraft(draftFromSpec(spec));
   },
   onConnect: (connection) => {
     const id = [
@@ -125,6 +134,9 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
   },
   setCanvasTool: (tool) => {
     set({ canvasTool: tool });
+  },
+  setCanvasOpen: (open) => {
+    set({ isCanvasOpen: open });
   },
   setRunResult: (result) => {
     set({ runResult: result });
@@ -179,9 +191,9 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
     });
 
     const draft: WorkflowDraft = {
-      name: starterWorkflowDraft.name,
-      description: starterWorkflowDraft.description,
-      version: starterWorkflowDraft.version,
+      name: state.name,
+      description: state.description,
+      version: state.version,
       nodes,
       edges
     };
@@ -208,3 +220,117 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
     }));
   }
 }));
+
+function draftFromSpec(spec: EvalRunSpec): WorkflowDraft {
+  const starterById = new Map(
+    starterWorkflowDraft.nodes.map((node) => [node.id, node])
+  );
+  const starterByType = new Map(
+    starterWorkflowDraft.nodes.map((node) => [node.type, node])
+  );
+
+  return {
+    name: spec.name,
+    description: "Imported from an Eval Studio run spec.",
+    version: spec.workflowVersion,
+    nodes: spec.nodes.map((node, index) => {
+      const starter = starterById.get(node.id) ?? starterByType.get(node.type);
+      const definition = getNodeDefinition(node.type);
+
+      return {
+        id: node.id,
+        type: node.type,
+        position: starter?.position ?? { x: index * 380, y: 120 },
+        data: {
+          label: starter?.data.label ?? definition?.title ?? node.type,
+          status: "idle",
+          config: node.config
+        }
+      };
+    }),
+    edges: spec.edges
+  };
+}
+
+function flowEdgesFromDraft(edges: WorkflowDraft["edges"]): EvalFlowEdge[] {
+  return edges.map((edge) => ({
+    id: edge.id,
+    source: edge.source,
+    sourceHandle: edge.sourceHandle ?? null,
+    target: edge.target,
+    targetHandle: edge.targetHandle ?? null
+  }));
+}
+
+function draftFromManifest(manifest: EvalSpecManifest): WorkflowDraft {
+  return {
+    ...starterWorkflowDraft,
+    name: `Imported ${manifest.input.datasetId}`,
+    description: "Imported from an image eval manifest.",
+    nodes: starterWorkflowDraft.nodes.map((node) => ({
+      ...node,
+      data: {
+        ...node.data,
+        config: configFromManifest(node.type, node.data.config, manifest)
+      }
+    }))
+  };
+}
+
+function configFromManifest(
+  type: string,
+  fallback: Record<string, unknown>,
+  manifest: EvalSpecManifest
+) {
+  switch (type) {
+    case "dataset.prompt_set":
+      return {
+        ...fallback,
+        inputUiMode: manifest.input.promptMode === "inline" ? "single" : "dataset",
+        mode: manifest.input.promptMode,
+        datasetId: manifest.input.datasetId,
+        sampleLimit: manifest.input.sampleLimit
+      };
+    case "prompt.template":
+      return {
+        ...fallback,
+        template: manifest.input.template ?? manifest.input.templatePreview,
+        ...(manifest.input.negativePrompt
+          ? { negativePrompt: manifest.input.negativePrompt }
+          : {})
+      };
+    case "generation.model_fanout":
+      return {
+        ...fallback,
+        models: manifest.providers.map((provider) => provider.model),
+        samplesPerPrompt: manifest.matrix.samplesPerPrompt,
+        seedStrategy: manifest.runtime.seedStrategy,
+        budgetUsd: manifest.matrix.estimatedGenerationCostUsd
+      };
+    case "metric.auto_image":
+      return {
+        ...fallback,
+        metrics: manifest.metrics,
+        budgetUsd: manifest.matrix.estimatedMetricCostUsd
+      };
+    case "human.pairwise":
+      return {
+        ...fallback,
+        sampleRate: manifest.humanReview.sampleRate,
+        reviewersPerTask: manifest.humanReview.reviewersPerTask,
+        blindMode: manifest.humanReview.blindMode
+      };
+    case "aggregate.model_scores":
+      return {
+        ...fallback,
+        rankingMethod: manifest.aggregation.rankingMethod
+      };
+    case "decision.release_gate":
+      return {
+        ...fallback,
+        ...manifest.aggregation.releaseGate
+      };
+    default:
+      return fallback;
+  }
+}

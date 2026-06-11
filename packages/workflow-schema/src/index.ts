@@ -63,6 +63,29 @@ export const NodeDefinitionSchema = z.object({
 export type Port = z.infer<typeof PortSchema>;
 export type EvalNodeDefinition = z.infer<typeof NodeDefinitionSchema>;
 
+export const ReferenceImageSchema = z.object({
+  id: z.string().min(1),
+  uri: z.string().min(1),
+  thumbnailUri: z.string().min(1).optional(),
+  mimeType: z.string().min(1).optional(),
+  width: z.number().int().positive().optional(),
+  height: z.number().int().positive().optional(),
+  source: z.enum(["upload", "url", "library", "generated"]).default("upload"),
+  role: z.enum(["reference", "style", "mask"]).default("reference"),
+  label: z.string().min(1).optional()
+});
+
+export const PromptCaseSchema = z.object({
+  id: z.string().min(1),
+  prompt: z.string().min(1),
+  expectedText: z.string().optional(),
+  tags: z.array(z.string()).default([]),
+  referenceImages: z.array(ReferenceImageSchema).default([])
+});
+
+export type ReferenceImage = z.infer<typeof ReferenceImageSchema>;
+export type PromptCase = z.infer<typeof PromptCaseSchema>;
+
 export const nodeDefinitions = [
   {
     type: "dataset.prompt_set",
@@ -82,8 +105,19 @@ export const nodeDefinitions = [
     ],
     requiredConfig: ["datasetId"],
     configSchema: {
+      mode: { type: "string", title: "Input mode", enum: ["dataset", "inline"] },
       datasetId: { type: "string", title: "Dataset ID" },
-      sampleLimit: { type: "number", title: "Sample limit" }
+      sampleLimit: { type: "number", title: "Sample limit" },
+      inlinePrompts: {
+        type: "array",
+        title: "Inline prompts",
+        items: { type: "object" }
+      },
+      referenceImages: {
+        type: "array",
+        title: "Reference images",
+        items: { type: "object" }
+      }
     },
     costSensitive: false
   },
@@ -388,11 +422,89 @@ export const EvalRunSpecNodeSchema = z.object({
   downstream: z.array(z.string())
 });
 
+export const EvalSpecIssueSchema = z.object({
+  severity: z.enum(["info", "warning", "error"]),
+  code: z.string().min(1),
+  message: z.string().min(1),
+  nodeId: z.string().min(1).optional()
+});
+
+export const EvalSpecManifestProviderSchema = z.object({
+  model: z.string().min(1),
+  provider: z.string().min(1),
+  samplesPerPrompt: z.number().int().positive(),
+  estimatedCostPerImageUsd: z.number().nonnegative(),
+  estimatedLatencyMs: z.number().int().nonnegative()
+});
+
+export const EvalSpecManifestSchema = z.object({
+  version: z.literal("image-eval-manifest/v1"),
+  configFormat: z.literal("eval-studio-json"),
+  generatedAt: z.string().datetime(),
+  input: z.object({
+    datasetId: z.string().min(1),
+    promptMode: z.enum(["dataset", "inline"]).default("dataset"),
+    sampleLimit: z.number().int().positive(),
+    promptCount: z.number().int().nonnegative(),
+    referenceImageCount: z.number().int().nonnegative().default(0),
+    template: z.string().optional(),
+    templatePreview: z.string(),
+    negativePrompt: z.string().optional()
+  }),
+  providers: z.array(EvalSpecManifestProviderSchema),
+  metrics: z.array(z.string().min(1)),
+  humanReview: z.object({
+    enabled: z.boolean(),
+    mode: z.literal("pairwise"),
+    blindMode: z.boolean(),
+    sampleRate: z.number().min(0).max(1),
+    reviewersPerTask: z.number().int().positive(),
+    estimatedTasks: z.number().int().nonnegative(),
+    estimatedVotes: z.number().int().nonnegative()
+  }),
+  aggregation: z.object({
+    rankingMethod: z.string().min(1),
+    releaseGate: z.object({
+      baselineRunId: z.string().min(1),
+      minHumanWinRate: z.number().min(0).max(1),
+      maxCostIncreasePct: z.number().nonnegative(),
+      safetyMustPass: z.boolean()
+    })
+  }),
+  runtime: z.object({
+    maxConcurrency: z.number().int().positive(),
+    repeat: z.number().int().positive(),
+    cache: z.boolean(),
+    seedStrategy: z.string().min(1)
+  }),
+  matrix: z.object({
+    promptCount: z.number().int().nonnegative(),
+    modelCount: z.number().int().nonnegative(),
+    samplesPerPrompt: z.number().int().positive(),
+    generationJobs: z.number().int().nonnegative(),
+    metricChecks: z.number().int().nonnegative(),
+    humanReviewTasks: z.number().int().nonnegative(),
+    totalPlannedOperations: z.number().int().nonnegative(),
+    estimatedGenerationCostUsd: z.number().nonnegative(),
+    estimatedMetricCostUsd: z.number().nonnegative(),
+    estimatedHumanReviewCostUsd: z.number().nonnegative(),
+    estimatedCostUsd: z.number().nonnegative(),
+    estimatedProviderLatencyMs: z.number().int().nonnegative()
+  }),
+  issues: z.array(EvalSpecIssueSchema),
+  exportHints: z.object({
+    configAsCode: z.literal(true),
+    ciRunnable: z.literal(true),
+    secretsPolicy: z.string().min(1)
+  })
+});
+
 export const EvalRunSpecSchema = z.object({
   workflowId: z.string().min(1),
   workflowVersion: z.number().int().positive(),
   name: z.string().min(1),
   compiledAt: z.string().datetime(),
+  manifest: EvalSpecManifestSchema,
   topologicalOrder: z.array(z.string()),
   nodes: z.array(EvalRunSpecNodeSchema),
   edges: z.array(WorkflowEdgeSchema)
@@ -403,6 +515,9 @@ export type WorkflowNode = z.infer<typeof WorkflowNodeSchema>;
 export type WorkflowEdge = z.infer<typeof WorkflowEdgeSchema>;
 export type WorkflowDraft = z.infer<typeof WorkflowDraftSchema>;
 export type EvalRunSpecNode = z.infer<typeof EvalRunSpecNodeSchema>;
+export type EvalSpecIssue = z.infer<typeof EvalSpecIssueSchema>;
+export type EvalSpecManifestProvider = z.infer<typeof EvalSpecManifestProviderSchema>;
+export type EvalSpecManifest = z.infer<typeof EvalSpecManifestSchema>;
 export type EvalRunSpec = z.infer<typeof EvalRunSpecSchema>;
 
 export const ImageProviderSchema = z.enum([
@@ -771,15 +886,27 @@ export const starterWorkflowDraft = {
         label: "Prompt Set",
         status: "idle",
         config: {
-          datasetId: "golden-image-prompts-v1",
-          sampleLimit: 200
+          inputUiMode: "single",
+          mode: "inline",
+          datasetId: "inline-run-input",
+          sampleLimit: 1,
+          inlinePrompts: [
+            {
+              id: "prompt-1",
+              prompt:
+                "A premium running shoe hero image on a clean studio background with readable launch text",
+              tags: ["single"],
+              referenceImages: []
+            }
+          ],
+          referenceImages: []
         }
       }
     },
     {
       id: "prompt-template",
       type: "prompt.template",
-      position: { x: 280, y: 120 },
+      position: { x: 380, y: 120 },
       data: {
         label: "Prompt Template",
         status: "idle",
@@ -791,7 +918,7 @@ export const starterWorkflowDraft = {
     {
       id: "model-fanout",
       type: "generation.model_fanout",
-      position: { x: 580, y: 120 },
+      position: { x: 760, y: 120 },
       data: {
         label: "Model Fanout",
         status: "idle",
@@ -806,7 +933,7 @@ export const starterWorkflowDraft = {
     {
       id: "artifact-store",
       type: "artifact.store",
-      position: { x: 900, y: 120 },
+      position: { x: 1140, y: 120 },
       data: {
         label: "Artifact Store",
         status: "idle",
@@ -819,7 +946,7 @@ export const starterWorkflowDraft = {
     {
       id: "auto-metrics",
       type: "metric.auto_image",
-      position: { x: 1220, y: 40 },
+      position: { x: 1520, y: 40 },
       data: {
         label: "Auto Metrics",
         status: "idle",
@@ -841,7 +968,7 @@ export const starterWorkflowDraft = {
     {
       id: "human-eval",
       type: "human.pairwise",
-      position: { x: 1220, y: 220 },
+      position: { x: 1520, y: 220 },
       data: {
         label: "Human Eval",
         status: "idle",
@@ -855,7 +982,7 @@ export const starterWorkflowDraft = {
     {
       id: "aggregate",
       type: "aggregate.model_scores",
-      position: { x: 1540, y: 120 },
+      position: { x: 1900, y: 120 },
       data: {
         label: "Aggregate",
         status: "idle",
@@ -867,7 +994,7 @@ export const starterWorkflowDraft = {
     {
       id: "release-gate",
       type: "decision.release_gate",
-      position: { x: 1840, y: 120 },
+      position: { x: 2280, y: 120 },
       data: {
         label: "Release Gate",
         status: "idle",

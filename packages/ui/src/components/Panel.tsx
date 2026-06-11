@@ -1,21 +1,45 @@
-import type { PropsWithChildren, ReactNode } from "react";
+import type { HTMLAttributes, PropsWithChildren, ReactNode } from "react";
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardHeader,
+  CardTitle
+} from "../coss/ui/card";
+import { cn } from "../coss/lib/utils";
 
-type PanelProps = PropsWithChildren<{
+type PanelProps = PropsWithChildren<
+  HTMLAttributes<HTMLElement> & {
   actions?: ReactNode;
-  className?: string;
   title: string;
-}>;
+}
+>;
 
-export function Panel({ actions, children, className, title }: PanelProps) {
-  const classes = ["ui-panel", className].filter(Boolean).join(" ");
+export function Panel({
+  actions,
+  children,
+  className,
+  title,
+  ...props
+}: PanelProps) {
+  const classes = cn("ui-panel", "coss-card", className);
 
   return (
-    <section className={classes}>
-      <header className="ui-panel__header">
-        <h2>{title}</h2>
-        {actions ? <div className="ui-panel__actions">{actions}</div> : null}
-      </header>
-      <div className="ui-panel__body">{children}</div>
-    </section>
+    <Card className={classes} render={<section {...props} />}>
+      <CardHeader
+        className="ui-panel__header coss-card__header"
+        render={<header />}
+      >
+        <CardTitle render={<h2 />}>{title}</CardTitle>
+        {actions ? (
+          <CardAction className="ui-panel__actions coss-card__actions">
+            {actions}
+          </CardAction>
+        ) : null}
+      </CardHeader>
+      <CardContent className="ui-panel__body coss-card__content">
+        {children}
+      </CardContent>
+    </Card>
   );
 }

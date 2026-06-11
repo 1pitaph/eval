@@ -181,6 +181,14 @@ export function exportRunUrl(runId: string, format: "csv" | "json") {
   return `${API_BASE_URL}/runs/${runId}/export.${format}`;
 }
 
+export function exportRunManifestUrl(runId: string) {
+  return `${API_BASE_URL}/runs/${runId}/manifest.json`;
+}
+
+export function exportRunSpecUrl(runId: string) {
+  return `${API_BASE_URL}/runs/${runId}/spec.json`;
+}
+
 export function listReviewCampaigns(runId: string) {
   return getJson<ReviewCampaignListResponse>(`/runs/${runId}/review-campaigns`);
 }

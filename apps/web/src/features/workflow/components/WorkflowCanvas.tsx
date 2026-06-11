@@ -1,10 +1,4 @@
-import {
-  memo,
-  useCallback,
-  useMemo,
-  useState,
-  type MouseEvent as ReactMouseEvent
-} from "react";
+import { memo, useCallback, useMemo } from "react";
 import {
   Background,
   getOutgoers,
@@ -14,15 +8,13 @@ import {
   ReactFlow,
   useReactFlow,
   type IsValidConnection,
-  type NodeProps,
-  type XYPosition
+  type NodeProps
 } from "@xyflow/react";
 import {
   arePortsCompatible,
   getNodeDefinition,
   getPort,
-  nodeDefinitions,
-  type NodeCategory
+  nodeDefinitions
 } from "@eval/workflow-schema";
 import { Badge } from "@eval/ui";
 import { getCanvasToolClassName } from "../config/canvasTools";
@@ -39,34 +31,30 @@ type ConnectionCandidate = {
   targetHandle?: string | null;
 };
 
-type ContextMenuState = {
-  flowPosition: XYPosition;
-  x: number;
-  y: number;
+const hierarchyLayout = {
+  startX: 72,
+  startY: 52,
+  columnGap: 330,
+  rowGap: 154
 };
 
-const categoryLabels: Record<NodeCategory, string> = {
-  input: "Input",
-  prompt: "Prompt",
-  generation: "Generation",
-  artifact: "Artifact",
-  eval: "Eval",
-  aggregate: "Aggregate",
-  decision: "Decision"
+const fixedViewport = {
+  x: 24,
+  y: 20,
+  zoom: 0.82
 };
 
 export function WorkflowCanvas() {
-  const [contextMenu, setContextMenu] = useState<ContextMenuState>();
   const canvasTool = useWorkflowStore((state) => state.canvasTool);
   const nodes = useWorkflowStore((state) => state.nodes);
   const edges = useWorkflowStore((state) => state.edges);
-  const addNodeAt = useWorkflowStore((state) => state.addNodeAt);
+  const layoutNodes = useMemo(() => layoutHierarchy(nodes, edges), [edges, nodes]);
   const onNodesChange = useWorkflowStore((state) => state.onNodesChange);
   const onEdgesChange = useWorkflowStore((state) => state.onEdgesChange);
   const onConnect = useWorkflowStore((state) => state.onConnect);
   const selectNode = useWorkflowStore((state) => state.selectNode);
   const setViewport = useWorkflowStore((state) => state.setViewport);
-  const { getNodes, getEdges, screenToFlowPosition } = useReactFlow<EvalFlowNode>();
+  const { getNodes, getEdges } = useReactFlow<EvalFlowNode>();
 
   const nodeTypes = useMemo(
     () =>
@@ -90,39 +78,6 @@ export function WorkflowCanvas() {
     }),
     []
   );
-  const groupedNodeDefinitions = useMemo(
-    () =>
-      nodeDefinitions.reduce(
-        (groups, definition) => {
-          groups[definition.category] = [
-            ...(groups[definition.category] ?? []),
-            definition
-          ];
-          return groups;
-        },
-        {} as Record<NodeCategory, typeof nodeDefinitions>
-      ),
-    []
-  );
-
-  const handlePaneContextMenu = useCallback(
-    (event: MouseEvent | ReactMouseEvent<Element>) => {
-      event.preventDefault();
-      selectNode(undefined);
-
-      const currentTarget = event.currentTarget as Element;
-      const bounds = currentTarget.getBoundingClientRect();
-      setContextMenu({
-        flowPosition: screenToFlowPosition({
-          x: event.clientX,
-          y: event.clientY
-        }),
-        x: event.clientX - bounds.left,
-        y: event.clientY - bounds.top
-      });
-    },
-    [screenToFlowPosition, selectNode]
-  );
 
   return (
     <section
@@ -132,11 +87,13 @@ export function WorkflowCanvas() {
       <ReactFlow
         colorMode="light"
         defaultEdgeOptions={defaultEdgeOptions}
+        defaultViewport={fixedViewport}
         edges={edges}
-        fitView
         isValidConnection={isValidConnection}
         nodeTypes={nodeTypes}
-        nodes={nodes}
+        nodes={layoutNodes}
+        nodesConnectable={false}
+        nodesDraggable={false}
         onConnect={onConnect}
         onEdgesChange={onEdgesChange}
         onMoveEnd={(_, viewport) => setViewport(viewport)}
@@ -144,52 +101,79 @@ export function WorkflowCanvas() {
         onNodesChange={onNodesChange}
         onPaneClick={() => {
           selectNode(undefined);
-          setContextMenu(undefined);
         }}
-        onPaneContextMenu={handlePaneContextMenu}
-        panOnDrag={canvasTool === "pan"}
-        selectionOnDrag={canvasTool === "select"}
+        onPaneContextMenu={(event) => event.preventDefault()}
+        panOnDrag
+        selectionOnDrag={false}
       >
         <Background gap={24} />
         <MiniMap pannable position="bottom-right" zoomable />
-        {contextMenu ? (
-          <div
-            className="canvas-context-menu"
-            role="menu"
-            style={{
-              left: contextMenu.x,
-              top: contextMenu.y
-            }}
-          >
-            <div className="canvas-context-menu__title">Add eval node</div>
-            {(
-              Object.entries(groupedNodeDefinitions) as Array<
-                [NodeCategory, typeof nodeDefinitions]
-              >
-            ).map(([category, definitions]) => (
-              <div className="canvas-context-menu__group" key={category}>
-                <span>{categoryLabels[category]}</span>
-                {definitions.map((definition) => (
-                  <button
-                    className="canvas-context-menu__item"
-                    key={definition.type}
-                    onClick={() => {
-                      addNodeAt(definition.type, contextMenu.flowPosition);
-                      setContextMenu(undefined);
-                    }}
-                    role="menuitem"
-                    type="button"
-                  >
-                    {definition.title}
-                  </button>
-                ))}
-              </div>
-            ))}
-          </div>
-        ) : null}
       </ReactFlow>
     </section>
   );
+}
+
+function layoutHierarchy(nodes: EvalFlowNode[], edges: EvalFlowEdge[]) {
+  const nodeIndex = new Map(nodes.map((node, index) => [node.id, index]));
+  const depthByNodeId = new Map<string, number>();
+  const incomingCount = new Map(nodes.map((node) => [node.id, 0]));
+
+  for (const edge of edges) {
+    incomingCount.set(edge.target, (incomingCount.get(edge.target) ?? 0) + 1);
+  }
+
+  for (const node of nodes) {
+    if ((incomingCount.get(node.id) ?? 0) === 0) {
+      depthByNodeId.set(node.id, 0);
+    }
+  }
+
+  for (let pass = 0; pass < nodes.length; pass += 1) {
+    for (const edge of edges) {
+      const sourceDepth = depthByNodeId.get(edge.source);
+      if (sourceDepth === undefined) {
+        continue;
+      }
+
+      const nextDepth = sourceDepth + 1;
+      const currentTargetDepth = depthByNodeId.get(edge.target) ?? 0;
+      if (nextDepth > currentTargetDepth) {
+        depthByNodeId.set(edge.target, nextDepth);
+      }
+    }
+  }
+
+  const groupedNodes = nodes.reduce(
+    (groups, node) => {
+      const depth = depthByNodeId.get(node.id) ?? 0;
+      groups[depth] = [...(groups[depth] ?? []), node];
+      return groups;
+    },
+    {} as Record<number, EvalFlowNode[]>
+  );
+  const orderedGroups = Object.fromEntries(
+    Object.entries(groupedNodes).map(([depth, group]) => [
+      depth,
+      [...group].sort(
+        (left, right) => (nodeIndex.get(left.id) ?? 0) - (nodeIndex.get(right.id) ?? 0)
+      )
+    ])
+  ) as Record<number, EvalFlowNode[]>;
+
+  return nodes.map((node) => {
+    const depth = depthByNodeId.get(node.id) ?? 0;
+    const siblings = orderedGroups[depth] ?? [];
+    const siblingIndex = siblings.findIndex((candidate) => candidate.id === node.id);
+
+    return {
+      ...node,
+      draggable: false,
+      position: {
+        x: hierarchyLayout.startX + depth * hierarchyLayout.columnGap,
+        y: hierarchyLayout.startY + Math.max(0, siblingIndex) * hierarchyLayout.rowGap
+      }
+    };
+  });
 }
 
 const EvalNode = memo(function EvalNode({

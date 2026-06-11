@@ -49,6 +49,33 @@ export async function registerRunRoutes(app: FastifyInstance) {
     }
   );
 
+  app.get<{ Params: { id: string } }>(
+    "/runs/:id/manifest.json",
+    async (request, reply) => {
+      const run = getRun(request.params.id);
+      if (!run) {
+        return reply.code(404).send({ message: "Run not found" });
+      }
+
+      return reply
+        .header("content-type", "application/json; charset=utf-8")
+        .header("content-disposition", `attachment; filename="${run.id}-manifest.json"`)
+        .send(run.spec.manifest);
+    }
+  );
+
+  app.get<{ Params: { id: string } }>("/runs/:id/spec.json", async (request, reply) => {
+    const run = getRun(request.params.id);
+    if (!run) {
+      return reply.code(404).send({ message: "Run not found" });
+    }
+
+    return reply
+      .header("content-type", "application/json; charset=utf-8")
+      .header("content-disposition", `attachment; filename="${run.id}-spec.json"`)
+      .send(run.spec);
+  });
+
   app.get<{ Params: { id: string } }>("/runs/:id", async (request, reply) => {
     const run = getRun(request.params.id);
     if (!run) {

@@ -1,8 +1,20 @@
 import { ReactFlowProvider } from "@xyflow/react";
-import { Braces, CircleDollarSign, GitBranch, Play } from "lucide-react";
-import { Badge, Button } from "@eval/ui";
+import { useState } from "react";
+import {
+  BarChart3,
+  Braces,
+  CircleDollarSign,
+  Expand,
+  GitBranch,
+  Play,
+  Settings2,
+  Sparkles,
+  X
+} from "lucide-react";
+import { Badge, Button, Dialog, DialogPopup, DialogTitle } from "@eval/ui";
 import { InspectorPanel } from "../features/workflow/components/InspectorPanel";
 import { ResultsWorkbench } from "../features/workflow/components/ResultsWorkbench";
+import { RunInputPanel } from "../features/workflow/components/RunInputPanel";
 import { RunPanel } from "../features/workflow/components/RunPanel";
 import { WorkflowCanvas } from "../features/workflow/components/WorkflowCanvas";
 import { BlindPairwiseReviewer } from "../features/review/components/BlindPairwiseReviewer";
@@ -19,9 +31,15 @@ export function App() {
 }
 
 function StudioApp() {
+  const isCanvasOpen = useWorkflowStore((state) => state.isCanvasOpen);
+  const setCanvasOpen = useWorkflowStore((state) => state.setCanvasOpen);
   const toDraft = useWorkflowStore((state) => state.toDraft);
   const setCompileResult = useWorkflowStore((state) => state.setCompileResult);
   const setRunResult = useWorkflowStore((state) => state.setRunResult);
+  const [activeSidebarPanel, setActiveSidebarPanel] =
+    useState<StudioSidebarPanel>("setup");
+  const activePanelMeta = sidebarPanels[activeSidebarPanel];
+  const showInlineCanvas = activeSidebarPanel === "results";
 
   const handleCompile = async () => {
     const result = await compileWorkflow(toDraft());
@@ -31,48 +49,198 @@ function StudioApp() {
   const handleRun = async () => {
     const result = await startRun(toDraft());
     setRunResult(result);
+    if ("run" in result) {
+      setActiveSidebarPanel("results");
+    }
   };
 
   return (
     <ReactFlowProvider>
-      <div className="app-shell">
-        <header className="topbar">
-          <div className="topbar__brand">
-            <GitBranch aria-hidden="true" size={22} />
-            <div>
-              <h1>Eval Studio</h1>
-              <p>Visual DAGs for image generation evals</p>
-            </div>
-          </div>
-          <div className="topbar__meta">
-            <Badge tone="info">Draft</Badge>
-            <span className="topbar__metric">
-              <CircleDollarSign aria-hidden="true" size={16} />
-              Budget-aware
-            </span>
-          </div>
-          <div className="topbar__actions">
-            <Button onClick={handleCompile} variant="secondary">
-              <Braces aria-hidden="true" size={16} />
-              Compile
-            </Button>
-            <Button onClick={handleRun} variant="primary">
-              <Play aria-hidden="true" size={16} />
-              Run
-            </Button>
-          </div>
-        </header>
+      <div className="app-shell coss-ui-root">
+        <div className="studio-layout">
+          <StudioSidebar
+            activePanel={activeSidebarPanel}
+            onPanelChange={setActiveSidebarPanel}
+          />
 
-        <main className="studio-grid">
-          <section className="canvas-stage" aria-label="Workflow builder">
-            <WorkflowCanvas />
-          </section>
-          <InspectorPanel />
-          <RunPanel />
-          <ResultsWorkbench />
-        </main>
+          <main className="studio-main" aria-label="Eval Studio workspace">
+            <header className="studio-commandbar">
+              <div className="studio-commandbar__title">
+                <span>Eval Studio</span>
+                <h1>{activePanelMeta.label}</h1>
+                <p>{activePanelMeta.subtitle}</p>
+              </div>
+              <div className="studio-commandbar__meta">
+                <Badge tone="info">Draft</Badge>
+                <span>
+                  <CircleDollarSign aria-hidden="true" size={16} />
+                  Budget-aware
+                </span>
+              </div>
+              <div className="studio-commandbar__actions">
+                <Button onClick={handleCompile} variant="secondary">
+                  <Braces aria-hidden="true" size={16} />
+                  Validate
+                </Button>
+                <Button onClick={handleRun} variant="primary">
+                  <Play aria-hidden="true" size={16} />
+                  Run Eval
+                </Button>
+              </div>
+            </header>
+
+            <div
+              className={`studio-dashboard ${
+                showInlineCanvas ? "" : "studio-dashboard--without-canvas"
+              }`}
+            >
+              <section
+                className="workspace-panel"
+                aria-label={`${activePanelMeta.label} workspace`}
+              >
+                {activeSidebarPanel === "setup" ? (
+                  <RunInputPanel />
+                ) : (
+                  <ResultsWorkbench />
+                )}
+              </section>
+
+              {showInlineCanvas ? (
+                <section className="canvas-workbench" aria-label="Workflow map">
+                  <header className="canvas-workbench__header">
+                    <div>
+                      <GitBranch aria-hidden="true" size={17} />
+                      <strong>Workflow Canvas</strong>
+                    </div>
+                    <Button
+                      onClick={() => setCanvasOpen(true)}
+                      type="button"
+                      variant="ghost"
+                    >
+                      <Expand aria-hidden="true" size={14} />
+                      Expand
+                    </Button>
+                  </header>
+                  <div className="canvas-workbench__body">
+                    <WorkflowCanvas />
+                  </div>
+                </section>
+              ) : null}
+
+              <aside className="studio-side-stack" aria-label="Workflow details">
+                <InspectorPanel />
+                <RunPanel />
+              </aside>
+            </div>
+          </main>
+        </div>
+
+        <Dialog
+          open={isCanvasOpen}
+          onOpenChange={(open) => setCanvasOpen(open)}
+        >
+          <DialogPopup
+            bottomStickOnMobile={false}
+            className="canvas-floating-page"
+            showCloseButton={false}
+          >
+              <header className="canvas-floating-page__header">
+                <div>
+                  <GitBranch aria-hidden="true" size={18} />
+                  <DialogTitle>Workflow Canvas</DialogTitle>
+                </div>
+                <Button
+                  onClick={() => setCanvasOpen(false)}
+                  type="button"
+                  variant="ghost"
+                >
+                  <X aria-hidden="true" size={15} />
+                  Close
+                </Button>
+              </header>
+              <div className="canvas-floating-page__body">
+                <WorkflowCanvas />
+              </div>
+          </DialogPopup>
+        </Dialog>
       </div>
     </ReactFlowProvider>
+  );
+}
+
+type StudioSidebarPanel = "setup" | "results";
+
+const sidebarPanels = {
+  setup: {
+    icon: Settings2,
+    label: "Setup",
+    subtitle: "Prompts, assets, models, and run budget"
+  },
+  results: {
+    icon: BarChart3,
+    label: "Eval Results",
+    subtitle: "Artifacts, comparisons, exports, and human review"
+  }
+} satisfies Record<
+  StudioSidebarPanel,
+  {
+    icon: typeof Settings2;
+    label: string;
+    subtitle: string;
+  }
+>;
+
+function StudioSidebar({
+  activePanel,
+  onPanelChange
+}: {
+  activePanel: StudioSidebarPanel;
+  onPanelChange: (panel: StudioSidebarPanel) => void;
+}) {
+  return (
+    <aside aria-label="Eval workspace sidebar" className="studio-sidebar">
+      <div className="studio-sidebar__logo" aria-label="Eval Studio">
+        <span>
+          <Sparkles aria-hidden="true" size={18} />
+        </span>
+        <strong>Eval Studio</strong>
+      </div>
+
+      <nav className="studio-sidebar__nav" aria-label="Sidebar panels">
+        {(Object.keys(sidebarPanels) as StudioSidebarPanel[]).map((panel) => {
+          const panelMeta = sidebarPanels[panel];
+          const Icon = panelMeta.icon;
+
+          return (
+            <Button
+              aria-current={activePanel === panel ? "page" : undefined}
+              className={`studio-sidebar__link ${
+                activePanel === panel ? "is-active" : ""
+              }`}
+              key={panel}
+              onClick={() => onPanelChange(panel)}
+              size="sm"
+              title={panelMeta.label}
+              type="button"
+              variant={activePanel === panel ? "primary" : "ghost"}
+            >
+              <Icon aria-hidden="true" size={19} />
+              <span>{panelMeta.label}</span>
+            </Button>
+          );
+        })}
+      </nav>
+
+      <div className="studio-sidebar__footer">
+        <div className="studio-sidebar__avatar" aria-hidden="true">
+          ES
+        </div>
+        <div>
+          <strong>Image Eval</strong>
+          <span>Visual DAG runner</span>
+        </div>
+      </div>
+    </aside>
   );
 }
 
