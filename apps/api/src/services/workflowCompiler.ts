@@ -4,6 +4,7 @@ import {
   getNodeDefinition,
   getPort,
   WorkflowDraftSchema,
+  type ApiProvider,
   type EvalRunSpec,
   type WorkflowDraft
 } from "@eval/workflow-schema";
@@ -20,7 +21,10 @@ export type CompileResult =
   | { ok: true; spec: EvalRunSpec; warnings: CompileIssue[] }
   | { ok: false; issues: CompileIssue[] };
 
-export function compileWorkflow(input: unknown): CompileResult {
+export function compileWorkflow(
+  input: unknown,
+  apiProviders: ApiProvider[] = []
+): CompileResult {
   const parsed = WorkflowDraftSchema.safeParse(input);
   if (!parsed.success) {
     return {
@@ -46,7 +50,7 @@ export function compileWorkflow(input: unknown): CompileResult {
     workflowVersion: draft.version,
     name: draft.name,
     compiledAt,
-    manifest: buildEvalManifest(draft, compiledAt),
+    manifest: buildEvalManifest(draft, compiledAt, apiProviders),
     topologicalOrder,
     edges: draft.edges,
     nodes: draft.nodes.map((node) => {

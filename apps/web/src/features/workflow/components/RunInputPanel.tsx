@@ -7,8 +7,10 @@ import {
   Table2,
   WandSparkles
 } from "lucide-react";
+import { useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 import type { ChangeEvent } from "react";
-import type { PromptCase, ReferenceImage } from "@eval/workflow-schema";
+import type { ApiProvider, PromptCase, ReferenceImage } from "@eval/workflow-schema";
 import {
   Badge,
   Button,
@@ -18,24 +20,56 @@ import {
   TextArea,
   TextInput
 } from "@eval/ui";
+import { listApiProviders } from "../../../shared/api/evalApi";
 import { useWorkflowStore } from "../state/workflowStore";
 
 type InputMode = "single" | "batch" | "dataset";
 type AssetRole = ReferenceImage["role"];
 
-const availableModels = ["gpt-image", "imagen", "flux", "sdxl"] as const;
-
-const modelCostUsd: Record<string, number> = {
-  "gpt-image": 0.045,
-  imagen: 0.038,
-  flux: 0.024,
-  sdxl: 0.016
+type AvailableModel = {
+  id: string;
+  name: string;
+  providerLabel: string;
+  estimatedCostPerImageUsd: number;
 };
+
+const fallbackAvailableModels: AvailableModel[] = [
+  {
+    id: "gpt-image",
+    name: "GPT Image",
+    providerLabel: "OpenAI",
+    estimatedCostPerImageUsd: 0.045
+  },
+  {
+    id: "imagen",
+    name: "Imagen",
+    providerLabel: "Google Imagen",
+    estimatedCostPerImageUsd: 0.038
+  },
+  {
+    id: "flux",
+    name: "FLUX",
+    providerLabel: "fal.ai",
+    estimatedCostPerImageUsd: 0.024
+  },
+  {
+    id: "sdxl",
+    name: "SDXL",
+    providerLabel: "Replicate",
+    estimatedCostPerImageUsd: 0.016
+  }
+];
+
+const visibleAssetRoles: AssetRole[] = ["reference"];
 
 const defaultPrompt =
   "A premium running shoe hero image on a clean studio background with readable launch text";
 
 export function RunInputPanel() {
+  const providersQuery = useQuery({
+    queryKey: ["api-providers"],
+    queryFn: listApiProviders
+  });
   const nodes = useWorkflowStore((state) => state.nodes);
   const updateNodeConfig = useWorkflowStore((state) => state.updateNodeConfig);
   const setCanvasOpen = useWorkflowStore((state) => state.setCanvasOpen);
@@ -58,18 +92,24 @@ export function RunInputPanel() {
   const sampleLimit = numberConfig(datasetConfig.sampleLimit, 4);
   const template = stringConfig(
     templateConfig.template,
-    "{{prompt}}\nStyle: commercial-ready, brand-safe, no watermark."
+    "{{prompt}}\nDirection: commercial-ready, brand-safe, no watermark."
   );
   const negativePrompt = stringConfig(
     templateConfig.negativePrompt,
     "watermark, distorted text, unsafe content"
   );
-  const selectedModels = stringArrayConfig(generationConfig.models, [
-    "gpt-image",
-    "imagen",
-    "flux",
-    "sdxl"
-  ]);
+  const availableModels = useMemo(
+    () => modelsFromProviders(providersQuery.data?.providers) ?? fallbackAvailableModels,
+    [providersQuery.data?.providers]
+  );
+  const availableModelIds = useMemo(
+    () => new Set(availableModels.map((model) => model.id)),
+    [availableModels]
+  );
+  const selectedModels = stringArrayConfig(
+    generationConfig.models,
+    availableModels.map((model) => model.id).slice(0, 4)
+  ).filter((model) => availableModelIds.has(model));
   const samplesPerPrompt = numberConfig(generationConfig.samplesPerPrompt, 2);
   const seedStrategy = stringConfig(generationConfig.seedStrategy, "fixed_by_prompt");
   const budgetUsd = numberConfig(generationConfig.budgetUsd, 50);
@@ -81,7 +121,12 @@ export function RunInputPanel() {
       ? Math.min(sampleLimit, 4)
       : Math.max(promptCases.length, 1);
   const imageCount = promptCount * selectedModels.length * samplesPerPrompt;
-  const estimatedCost = estimateCost(promptCount, selectedModels, samplesPerPrompt);
+  const estimatedCost = estimateCost(
+    promptCount,
+    selectedModels,
+    samplesPerPrompt,
+    availableModels
+  );
   const variables = variablesFromTemplate(template);
   const renderedPreview = template.replaceAll("{{prompt}}", singlePrompt);
   const issues = readinessIssues({
@@ -305,7 +350,7 @@ export function RunInputPanel() {
           ) : null}
 
           <div className="asset-tray">
-            {(["reference", "style", "mask"] as AssetRole[]).map((role) => (
+            {visibleAssetRoles.map((role) => (
               <AssetSlot
                 asset={referenceImages.find((image) => image.role === role)}
                 key={role}
@@ -367,15 +412,23 @@ export function RunInputPanel() {
           </div>
           <div className="model-choice-grid">
             {availableModels.map((model) => (
-              <div className="model-choice" key={model}>
+              <div className="model-choice" key={model.id}>
                 <CheckboxControl
-                  checked={selectedModels.includes(model)}
-                  onCheckedChange={() => toggleModel(model)}
+                  checked={selectedModels.includes(model.id)}
+                  onCheckedChange={() => toggleModel(model.id)}
                 />
-                <span>{model}</span>
+                <span>
+                  <strong>{model.name}</strong>
+                  <small>{model.providerLabel}</small>
+                </span>
               </div>
             ))}
           </div>
+          {availableModels.length === 0 ? (
+            <div className="readiness-issues">
+              <span>No enabled image models. Add one in API Providers.</span>
+            </div>
+          ) : null}
           <div className="run-plan-grid">
             <label className="run-input-field">
               Samples
@@ -599,9 +652,54 @@ function variablesFromTemplate(template: string) {
     .filter((variable): variable is string => Boolean(variable));
 }
 
-function estimateCost(promptCount: number, models: string[], samplesPerPrompt: number) {
+function modelsFromProviders(
+  providers: ApiProvider[] | undefined
+): AvailableModel[] | undefined {
+  if (!providers) {
+    return undefined;
+  }
+
+  const seen = new Set<string>();
+  const models: AvailableModel[] = [];
+
+  for (const provider of providers) {
+    if (!provider.enabled) {
+      continue;
+    }
+
+    for (const model of provider.models) {
+      if (
+        !model.enabled ||
+        !model.capabilities.includes("image-generation") ||
+        seen.has(model.id)
+      ) {
+        continue;
+      }
+
+      seen.add(model.id);
+      models.push({
+        id: model.id,
+        name: model.name,
+        providerLabel: provider.label,
+        estimatedCostPerImageUsd: model.estimatedCostPerImageUsd
+      });
+    }
+  }
+
+  return models;
+}
+
+function estimateCost(
+  promptCount: number,
+  models: string[],
+  samplesPerPrompt: number,
+  availableModels: AvailableModel[]
+) {
+  const modelCostUsd = new Map(
+    availableModels.map((model) => [model.id, model.estimatedCostPerImageUsd])
+  );
   const perPromptCost = models.reduce(
-    (total, model) => total + (modelCostUsd[model] ?? 0.03),
+    (total, model) => total + (modelCostUsd.get(model) ?? 0.03),
     0
   );
   return Math.round(promptCount * samplesPerPrompt * perPromptCost * 100) / 100;

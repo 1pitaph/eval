@@ -1,10 +1,10 @@
 import type { FastifyInstance } from "fastify";
-import { getRun, saveRun } from "../lib/inMemoryStore";
+import { getRun, listApiProviders, saveRun } from "../lib/inMemoryStore";
 import { compileWorkflow } from "../services/workflowCompiler";
 
 export async function registerRunRoutes(app: FastifyInstance) {
   app.post("/runs", async (request, reply) => {
-    const compiled = compileWorkflow(request.body);
+    const compiled = compileWorkflow(request.body, listApiProviders());
     if (!compiled.ok) {
       return reply.code(422).send(compiled);
     }

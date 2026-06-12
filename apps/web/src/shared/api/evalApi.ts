@@ -1,4 +1,7 @@
 import type {
+  ApiProvider,
+  ApiProviderInput,
+  ApiProviderPatch,
   EvalRunRecord,
   EvalRunSpec,
   PairwiseVote,
@@ -112,6 +115,14 @@ export type AggregateReviewResponse = {
   };
 };
 
+export type ApiProviderListResponse = {
+  providers: ApiProvider[];
+};
+
+export type ApiProviderResponse = {
+  provider: ApiProvider;
+};
+
 async function getJson<T>(path: string): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`);
   const payload = (await response.json()) as T;
@@ -137,6 +148,38 @@ async function postReviewJson<T>(path: string, body: unknown): Promise<T> {
   }
 
   return payload;
+}
+
+async function patchJson<T>(path: string, body: unknown): Promise<T> {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(body)
+  });
+
+  const payload = (await response.json()) as T;
+  if (!response.ok) {
+    throw new Error(errorMessage(payload, response.status));
+  }
+
+  return payload;
+}
+
+async function deleteJson(path: string): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    method: "DELETE"
+  });
+  if (!response.ok) {
+    let payload: unknown = undefined;
+    try {
+      payload = await response.json();
+    } catch {
+      // No response body to parse.
+    }
+    throw new Error(errorMessage(payload, response.status));
+  }
 }
 
 function errorMessage(payload: unknown, status: number) {
@@ -175,6 +218,26 @@ export function compileWorkflow(draft: WorkflowDraft) {
 
 export function startRun(draft: WorkflowDraft) {
   return postJson<RunResponse>("/runs", draft);
+}
+
+export function listApiProviders() {
+  return getJson<ApiProviderListResponse>("/providers");
+}
+
+export function createApiProvider(input: ApiProviderInput) {
+  return postReviewJson<ApiProviderResponse>("/providers", input);
+}
+
+export function updateApiProvider(id: string, patch: ApiProviderPatch) {
+  return patchJson<ApiProviderResponse>(`/providers/${id}`, patch);
+}
+
+export function deleteApiProvider(id: string) {
+  return deleteJson(`/providers/${id}`);
+}
+
+export function testApiProviderConnection(id: string) {
+  return postReviewJson<ApiProviderResponse>(`/providers/${id}/test`, {});
 }
 
 export function exportRunUrl(runId: string, format: "csv" | "json") {

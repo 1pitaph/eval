@@ -1337,6 +1337,9 @@ function normalizeProvider(value: string): ImageProvider {
   if (normalized.includes("openai") || normalized.includes("gpt")) {
     return "openai";
   }
+  if (normalized.includes("custom") || normalized.includes("compatible")) {
+    return "custom";
+  }
   return "imported";
 }
 

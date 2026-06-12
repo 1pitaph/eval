@@ -4,6 +4,7 @@ import {
   type ReferenceImage
 } from "@eval/workflow-schema";
 import type {
+  ApiProvider,
   EvalDecision,
   EvalRunEvent,
   EvalRunRecord,
@@ -112,6 +113,16 @@ const providerProfiles: Record<ImageProvider, ProviderProfile> = {
     qualityBias: 0.72,
     safetyBias: 0.93
   },
+  custom: {
+    provider: "custom",
+    label: "Custom",
+    colorA: "#334155",
+    colorB: "#cbd5e1",
+    baseCostUsd: 0.03,
+    baseLatencyMs: 4000,
+    qualityBias: 0.76,
+    safetyBias: 0.94
+  },
   imported: {
     provider: "imported",
     label: "Imported",
@@ -140,7 +151,8 @@ const defaultPromptSuite = promptSuites["golden-image-prompts-v1"] ?? [];
 export function runImageEvalSpec(
   spec: EvalRunSpec,
   id: string,
-  createdAt: string
+  createdAt: string,
+  apiProviders: ApiProvider[] = []
 ): EvalRunRecord {
   const datasetConfig = getNodeConfig(spec, "dataset.prompt_set");
   const promptTemplateConfig = getNodeConfig(spec, "prompt.template");
@@ -180,8 +192,8 @@ export function runImageEvalSpec(
 
   for (const prompt of prompts) {
     for (const model of models) {
-      const provider = providerFromModel(model);
-      const profile = providerProfiles[provider];
+      const provider = providerFromModel(model, apiProviders);
+      const profile = providerProfileForModel(model, provider, apiProviders);
 
       for (let sampleIndex = 0; sampleIndex < samplesPerPrompt; sampleIndex += 1) {
         const seed = hashInt(`${prompt.id}:${model}:${sampleIndex}`) % 900000;
@@ -383,7 +395,15 @@ function normalizeMetrics(value: unknown): ImageMetric[] {
   return Array.from(new Set(mapped.length > 0 ? mapped : defaultMetrics));
 }
 
-function providerFromModel(model: string): ImageProvider {
+function providerFromModel(
+  model: string,
+  apiProviders: ApiProvider[] = []
+): ImageProvider {
+  const configured = findConfiguredModel(model, apiProviders);
+  if (configured) {
+    return imageProviderFromApiKind(configured.provider.kind);
+  }
+
   const normalized = model.toLowerCase();
   if (normalized.includes("imagen") || normalized.includes("google")) {
     return "google-imagen";
@@ -395,6 +415,64 @@ function providerFromModel(model: string): ImageProvider {
     return "replicate";
   }
   return "openai";
+}
+
+function providerProfileForModel(
+  model: string,
+  provider: ImageProvider,
+  apiProviders: ApiProvider[]
+): ProviderProfile {
+  const baseProfile = providerProfiles[provider];
+  const configured = findConfiguredModel(model, apiProviders);
+  if (!configured) {
+    return baseProfile;
+  }
+
+  return {
+    ...baseProfile,
+    label: configured.model.name,
+    baseCostUsd: configured.model.estimatedCostPerImageUsd,
+    baseLatencyMs: configured.model.estimatedLatencyMs
+  };
+}
+
+function findConfiguredModel(model: string, apiProviders: ApiProvider[]) {
+  const normalized = model.toLowerCase();
+
+  for (const provider of apiProviders) {
+    if (!provider.enabled) {
+      continue;
+    }
+
+    const match = provider.models.find(
+      (candidate) =>
+        candidate.enabled &&
+        candidate.capabilities.includes("image-generation") &&
+        (candidate.id.toLowerCase() === normalized ||
+          candidate.name.toLowerCase() === normalized)
+    );
+    if (match) {
+      return { provider, model: match };
+    }
+  }
+
+  return undefined;
+}
+
+function imageProviderFromApiKind(kind: ApiProvider["kind"]): ImageProvider {
+  switch (kind) {
+    case "openai":
+      return "openai";
+    case "google-imagen":
+      return "google-imagen";
+    case "fal":
+      return "fal";
+    case "replicate":
+      return "replicate";
+    case "openai-compatible":
+    case "custom":
+      return "custom";
+  }
 }
 
 function renderPrompt(template: string, prompt: string) {

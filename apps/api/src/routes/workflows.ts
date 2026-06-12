@@ -1,6 +1,11 @@
 import type { FastifyInstance } from "fastify";
 import { nodeDefinitions, starterWorkflowDraft } from "@eval/workflow-schema";
-import { getWorkflow, listWorkflows, saveWorkflow } from "../lib/inMemoryStore";
+import {
+  getWorkflow,
+  listApiProviders,
+  listWorkflows,
+  saveWorkflow
+} from "../lib/inMemoryStore";
 import { compileWorkflow } from "../services/workflowCompiler";
 
 export async function registerWorkflowRoutes(app: FastifyInstance) {
@@ -20,7 +25,7 @@ export async function registerWorkflowRoutes(app: FastifyInstance) {
   });
 
   app.post("/workflows", async (request, reply) => {
-    const compiled = compileWorkflow(request.body);
+    const compiled = compileWorkflow(request.body, listApiProviders());
     if (!compiled.ok) {
       return reply.code(422).send(compiled);
     }
@@ -30,7 +35,7 @@ export async function registerWorkflowRoutes(app: FastifyInstance) {
   });
 
   app.post("/workflows/compile", async (request, reply) => {
-    const compiled = compileWorkflow(request.body);
+    const compiled = compileWorkflow(request.body, listApiProviders());
     return reply.code(compiled.ok ? 200 : 422).send(compiled);
   });
 }

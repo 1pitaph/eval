@@ -1,6 +1,7 @@
 import cors from "@fastify/cors";
 import Fastify from "fastify";
 import { env } from "./config/env";
+import { registerProviderRoutes } from "./routes/providers";
 import { registerReviewRoutes } from "./routes/reviews";
 import { registerRunRoutes } from "./routes/runs";
 import { registerWorkflowRoutes } from "./routes/workflows";
@@ -22,6 +23,7 @@ app.get("/health", async () => ({
 }));
 
 await app.register(registerWorkflowRoutes, { prefix: "/api" });
+await app.register(registerProviderRoutes, { prefix: "/api" });
 await app.register(registerRunRoutes, { prefix: "/api" });
 await app.register(registerReviewRoutes, { prefix: "/api" });
 

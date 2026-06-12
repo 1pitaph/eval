@@ -2,6 +2,7 @@ import {
   getNodeDefinition,
   PromptCaseSchema,
   ReferenceImageSchema,
+  type ApiProvider,
   type EvalSpecIssue,
   type EvalSpecManifest,
   type WorkflowDraft
@@ -43,7 +44,8 @@ const humanVoteCostUsd = 0.04;
 
 export function buildEvalManifest(
   draft: WorkflowDraft,
-  generatedAt: string
+  generatedAt: string,
+  apiProviders: ApiProvider[] = []
 ): EvalSpecManifest {
   const datasetConfig = getNodeConfig(draft, "dataset.prompt_set");
   const promptTemplateConfig = getNodeConfig(draft, "prompt.template");
@@ -107,7 +109,7 @@ export function buildEvalManifest(
 
   const providers = models.map((model) => ({
     model,
-    ...profileForModel(model),
+    ...profileForModel(model, apiProviders),
     samplesPerPrompt
   }));
   const generationJobs = promptCount * providers.length * samplesPerPrompt;
@@ -218,7 +220,19 @@ function getNodeConfig(draft: WorkflowDraft, type: string) {
   return draft.nodes.find((node) => node.type === type)?.data.config ?? {};
 }
 
-function profileForModel(model: string): ModelCostProfile {
+function profileForModel(
+  model: string,
+  apiProviders: ApiProvider[] = []
+): ModelCostProfile {
+  const configured = findConfiguredModel(model, apiProviders);
+  if (configured) {
+    return {
+      provider: configured.provider.id,
+      estimatedCostPerImageUsd: configured.model.estimatedCostPerImageUsd,
+      estimatedLatencyMs: configured.model.estimatedLatencyMs
+    };
+  }
+
   const normalized = model.toLowerCase();
   if (normalized.includes("imagen") || normalized.includes("google")) {
     return {
@@ -247,6 +261,29 @@ function profileForModel(model: string): ModelCostProfile {
     estimatedCostPerImageUsd: 0.045,
     estimatedLatencyMs: 4200
   };
+}
+
+function findConfiguredModel(model: string, apiProviders: ApiProvider[]) {
+  const normalized = model.toLowerCase();
+
+  for (const provider of apiProviders) {
+    if (!provider.enabled) {
+      continue;
+    }
+
+    const match = provider.models.find(
+      (candidate) =>
+        candidate.enabled &&
+        candidate.capabilities.includes("image-generation") &&
+        (candidate.id.toLowerCase() === normalized ||
+          candidate.name.toLowerCase() === normalized)
+    );
+    if (match) {
+      return { provider, model: match };
+    }
+  }
+
+  return undefined;
 }
 
 function manifestIssues({

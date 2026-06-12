@@ -525,8 +525,89 @@ export const ImageProviderSchema = z.enum([
   "google-imagen",
   "fal",
   "replicate",
+  "custom",
   "imported"
 ]);
+
+export const ApiProviderKindSchema = z.enum([
+  "openai",
+  "google-imagen",
+  "fal",
+  "replicate",
+  "openai-compatible",
+  "custom"
+]);
+
+export const ApiProviderModelCapabilitySchema = z.enum([
+  "image-generation",
+  "text-generation",
+  "vision",
+  "judge",
+  "embedding"
+]);
+
+export const ApiProviderCredentialStatusSchema = z.enum([
+  "not_configured",
+  "configured",
+  "valid",
+  "invalid"
+]);
+
+export const ApiProviderModelSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1),
+  enabled: z.boolean().default(true),
+  capabilities: z.array(ApiProviderModelCapabilitySchema).default(["image-generation"]),
+  estimatedCostPerImageUsd: z.number().nonnegative().default(0.03),
+  estimatedLatencyMs: z.number().int().nonnegative().default(4000)
+});
+
+export const ApiProviderCredentialSchema = z.object({
+  status: ApiProviderCredentialStatusSchema,
+  maskedKey: z.string().optional(),
+  lastTestedAt: z.string().datetime().optional(),
+  message: z.string().optional()
+});
+
+export const ApiProviderSchema = z.object({
+  id: z.string().min(1),
+  label: z.string().min(1),
+  kind: ApiProviderKindSchema,
+  baseUrl: z.string().min(1),
+  docsUrl: z.string().url().optional(),
+  enabled: z.boolean().default(true),
+  credential: ApiProviderCredentialSchema,
+  models: z.array(ApiProviderModelSchema).default([]),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime()
+});
+
+export const ApiProviderInputSchema = z.object({
+  label: z.string().min(1),
+  kind: ApiProviderKindSchema,
+  baseUrl: z.string().min(1),
+  docsUrl: z.string().url().optional(),
+  enabled: z.boolean().default(true),
+  apiKey: z.string().optional(),
+  models: z.array(ApiProviderModelSchema).default([])
+});
+
+export const ApiProviderPatchSchema = ApiProviderInputSchema.partial().extend({
+  apiKey: z.string().optional()
+});
+
+export type ApiProviderKind = z.infer<typeof ApiProviderKindSchema>;
+export type ApiProviderModelCapability = z.infer<
+  typeof ApiProviderModelCapabilitySchema
+>;
+export type ApiProviderCredentialStatus = z.infer<
+  typeof ApiProviderCredentialStatusSchema
+>;
+export type ApiProviderModel = z.infer<typeof ApiProviderModelSchema>;
+export type ApiProviderCredential = z.infer<typeof ApiProviderCredentialSchema>;
+export type ApiProvider = z.infer<typeof ApiProviderSchema>;
+export type ApiProviderInput = z.infer<typeof ApiProviderInputSchema>;
+export type ApiProviderPatch = z.infer<typeof ApiProviderPatchSchema>;
 
 export const ImageMetricSchema = z.enum([
   "vlm_rubric",
@@ -911,7 +992,7 @@ export const starterWorkflowDraft = {
         label: "Prompt Template",
         status: "idle",
         config: {
-          template: "{{prompt}}\nStyle: commercial-ready, brand-safe, no watermark."
+          template: "{{prompt}}\nDirection: commercial-ready, brand-safe, no watermark."
         }
       }
     },

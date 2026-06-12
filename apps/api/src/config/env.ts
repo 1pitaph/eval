@@ -9,7 +9,9 @@ const numberFromEnv = (value: string | undefined, fallback: number) => {
 
 export const env = {
   apiHost: process.env.API_HOST ?? "0.0.0.0",
-  apiPort: numberFromEnv(process.env.API_PORT, 4310),
-  corsOrigin: process.env.CORS_ORIGIN ?? "http://localhost:5173",
+  apiPort: numberFromEnv(process.env.API_PORT, 8456),
+  corsOrigin:
+    process.env.CORS_ORIGIN ??
+    `http://localhost:${numberFromEnv(process.env.WEB_PORT ?? process.env.PORT, 8455)}`,
   nodeEnv: process.env.NODE_ENV ?? "development"
 };

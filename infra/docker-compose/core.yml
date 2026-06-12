@@ -5,7 +5,7 @@ services:
     env_file:
       - ../env/.env.example
     ports:
-      - "4310:4310"
+      - "8456:8456"
     volumes:
       - ../..:/workspace
     working_dir: /workspace
@@ -17,8 +17,9 @@ services:
       - api
     environment:
       VITE_API_BASE_URL: /api
+      WEB_PORT: 8455
     ports:
-      - "5173:5173"
+      - "8455:8455"
     volumes:
       - ../..:/workspace
     working_dir: /workspace

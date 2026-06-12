@@ -6,6 +6,7 @@ import {
   CircleDollarSign,
   Expand,
   GitBranch,
+  KeyRound,
   Play,
   Settings2,
   Sparkles,
@@ -14,10 +15,10 @@ import {
 import { Badge, Button, Dialog, DialogPopup, DialogTitle } from "@eval/ui";
 import { InspectorPanel } from "../features/workflow/components/InspectorPanel";
 import { ResultsWorkbench } from "../features/workflow/components/ResultsWorkbench";
-import { RunInputPanel } from "../features/workflow/components/RunInputPanel";
 import { RunPanel } from "../features/workflow/components/RunPanel";
 import { WorkflowCanvas } from "../features/workflow/components/WorkflowCanvas";
 import { BlindPairwiseReviewer } from "../features/review/components/BlindPairwiseReviewer";
+import { ProviderManagementPanel } from "../features/providers/components/ProviderManagementPanel";
 import { compileWorkflow, startRun } from "../shared/api/evalApi";
 import { useWorkflowStore } from "../features/workflow/state/workflowStore";
 
@@ -39,7 +40,8 @@ function StudioApp() {
   const [activeSidebarPanel, setActiveSidebarPanel] =
     useState<StudioSidebarPanel>("setup");
   const activePanelMeta = sidebarPanels[activeSidebarPanel];
-  const showInlineCanvas = activeSidebarPanel === "results";
+  const isProviderPanel = activeSidebarPanel === "providers";
+  const showWorkflowActions = activeSidebarPanel !== "providers";
 
   const handleCompile = async () => {
     const result = await compileWorkflow(toDraft());
@@ -71,66 +73,86 @@ function StudioApp() {
                 <p>{activePanelMeta.subtitle}</p>
               </div>
               <div className="studio-commandbar__meta">
-                <Badge tone="info">Draft</Badge>
-                <span>
-                  <CircleDollarSign aria-hidden="true" size={16} />
-                  Budget-aware
-                </span>
+                <Badge tone={activeSidebarPanel === "providers" ? "neutral" : "info"}>
+                  {activeSidebarPanel === "providers" ? "Local" : "Draft"}
+                </Badge>
+                {activeSidebarPanel === "providers" ? (
+                  <span>
+                    <KeyRound aria-hidden="true" size={16} />
+                    Secrets redacted
+                  </span>
+                ) : (
+                  <span>
+                    <CircleDollarSign aria-hidden="true" size={16} />
+                    Budget-aware
+                  </span>
+                )}
               </div>
-              <div className="studio-commandbar__actions">
-                <Button onClick={handleCompile} variant="secondary">
-                  <Braces aria-hidden="true" size={16} />
-                  Validate
-                </Button>
-                <Button onClick={handleRun} variant="primary">
-                  <Play aria-hidden="true" size={16} />
-                  Run Eval
-                </Button>
-              </div>
+              {showWorkflowActions ? (
+                <div className="studio-commandbar__actions">
+                  <Button onClick={handleCompile} variant="secondary">
+                    <Braces aria-hidden="true" size={16} />
+                    Validate
+                  </Button>
+                  <Button onClick={handleRun} variant="primary">
+                    <Play aria-hidden="true" size={16} />
+                    Run Eval
+                  </Button>
+                </div>
+              ) : null}
             </header>
 
             <div
               className={`studio-dashboard ${
-                showInlineCanvas ? "" : "studio-dashboard--without-canvas"
+                isProviderPanel
+                  ? "studio-dashboard--providers"
+                  : "studio-dashboard--pipeline"
               }`}
             >
-              <section
-                className="workspace-panel"
-                aria-label={`${activePanelMeta.label} workspace`}
-              >
-                {activeSidebarPanel === "setup" ? (
-                  <RunInputPanel />
-                ) : (
-                  <ResultsWorkbench />
-                )}
-              </section>
-
-              {showInlineCanvas ? (
-                <section className="canvas-workbench" aria-label="Workflow map">
-                  <header className="canvas-workbench__header">
-                    <div>
-                      <GitBranch aria-hidden="true" size={17} />
-                      <strong>Workflow Canvas</strong>
-                    </div>
-                    <Button
-                      onClick={() => setCanvasOpen(true)}
-                      type="button"
-                      variant="ghost"
-                    >
-                      <Expand aria-hidden="true" size={14} />
-                      Expand
-                    </Button>
-                  </header>
-                  <div className="canvas-workbench__body">
-                    <WorkflowCanvas />
-                  </div>
+              {isProviderPanel ? (
+                <section
+                  className="workspace-panel"
+                  aria-label={`${activePanelMeta.label} workspace`}
+                >
+                  <ProviderManagementPanel />
                 </section>
-              ) : null}
+              ) : (
+                <>
+                  <section
+                    className="canvas-workbench canvas-workbench--pipeline"
+                    aria-label="Workflow pipeline"
+                  >
+                      <Button
+                        className="canvas-workbench__expand"
+                        onClick={() => setCanvasOpen(true)}
+                        title="Expand workflow canvas"
+                        type="button"
+                        variant="ghost"
+                      >
+                        <Expand aria-hidden="true" size={14} />
+                        <span className="visually-hidden">Expand</span>
+                      </Button>
+                    <div className="canvas-workbench__body">
+                      <WorkflowCanvas variant="pipeline" />
+                    </div>
+                  </section>
 
-              <aside className="studio-side-stack" aria-label="Workflow details">
-                <InspectorPanel />
-                <RunPanel />
-              </aside>
+                  <section
+                    className="workspace-panel"
+                    aria-label={`${activePanelMeta.label} details`}
+                  >
+                    {activeSidebarPanel === "results" ? (
+                      <ResultsWorkbench />
+                    ) : (
+                      <InspectorPanel />
+                    )}
+                  </section>
+
+                  <aside className="studio-side-stack" aria-label="Run status">
+                    <RunPanel />
+                  </aside>
+                </>
+              )}
             </div>
           </main>
         </div>
@@ -168,7 +190,7 @@ function StudioApp() {
   );
 }
 
-type StudioSidebarPanel = "setup" | "results";
+type StudioSidebarPanel = "setup" | "results" | "providers";
 
 const sidebarPanels = {
   setup: {
@@ -180,6 +202,11 @@ const sidebarPanels = {
     icon: BarChart3,
     label: "Eval Results",
     subtitle: "Artifacts, comparisons, exports, and human review"
+  },
+  providers: {
+    icon: KeyRound,
+    label: "API Providers",
+    subtitle: "Provider credentials, base URLs, and model availability"
   }
 } satisfies Record<
   StudioSidebarPanel,
@@ -230,16 +257,6 @@ function StudioSidebar({
           );
         })}
       </nav>
-
-      <div className="studio-sidebar__footer">
-        <div className="studio-sidebar__avatar" aria-hidden="true">
-          ES
-        </div>
-        <div>
-          <strong>Image Eval</strong>
-          <span>Visual DAG runner</span>
-        </div>
-      </div>
     </aside>
   );
 }

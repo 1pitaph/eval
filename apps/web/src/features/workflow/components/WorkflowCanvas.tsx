@@ -31,38 +31,55 @@ type ConnectionCandidate = {
   targetHandle?: string | null;
 };
 
-const hierarchyLayout = {
-  startX: 72,
-  startY: 52,
-  columnGap: 330,
-  rowGap: 154
+type WorkflowCanvasVariant = "full" | "pipeline";
+
+const hierarchyLayouts = {
+  full: {
+    startX: 72,
+    startY: 52,
+    columnGap: 330,
+    rowGap: 154
+  },
+  pipeline: {
+    startX: 44,
+    startY: 34,
+    columnGap: 228,
+    rowGap: 82
+  }
 };
 
-const fixedViewport = {
-  x: 24,
-  y: 20,
-  zoom: 0.82
+const fixedViewports = {
+  full: {
+    x: 24,
+    y: 20,
+    zoom: 0.82
+  },
+  pipeline: {
+    x: 10,
+    y: 18,
+    zoom: 0.74
+  }
 };
 
-export function WorkflowCanvas() {
+export function WorkflowCanvas({
+  variant = "full"
+}: {
+  variant?: WorkflowCanvasVariant;
+}) {
   const canvasTool = useWorkflowStore((state) => state.canvasTool);
   const nodes = useWorkflowStore((state) => state.nodes);
   const edges = useWorkflowStore((state) => state.edges);
-  const layoutNodes = useMemo(() => layoutHierarchy(nodes, edges), [edges, nodes]);
+  const selectedNodeId = useWorkflowStore((state) => state.selectedNodeId);
+  const layoutNodes = useMemo(
+    () => layoutHierarchy(nodes, edges, variant, selectedNodeId),
+    [edges, nodes, selectedNodeId, variant]
+  );
   const onNodesChange = useWorkflowStore((state) => state.onNodesChange);
   const onEdgesChange = useWorkflowStore((state) => state.onEdgesChange);
   const onConnect = useWorkflowStore((state) => state.onConnect);
   const selectNode = useWorkflowStore((state) => state.selectNode);
   const setViewport = useWorkflowStore((state) => state.setViewport);
   const { getNodes, getEdges } = useReactFlow<EvalFlowNode>();
-
-  const nodeTypes = useMemo(
-    () =>
-      Object.fromEntries(
-        nodeDefinitions.map((definition) => [definition.type, EvalNode])
-      ),
-    []
-  );
 
   const isValidConnection: IsValidConnection = useCallback(
     (connection) =>
@@ -78,42 +95,71 @@ export function WorkflowCanvas() {
     }),
     []
   );
+  const fitViewOptions = useMemo(
+    () =>
+      variant === "pipeline"
+        ? { maxZoom: 0.92, minZoom: 0.45, padding: 0.08 }
+        : { maxZoom: 0.82, minZoom: 0.12, padding: 0.18 },
+    [variant]
+  );
+
+  const updateSelectedNode = useCallback(
+    (nodeId: string | undefined) => {
+      if (nodeId !== selectedNodeId) {
+        selectNode(nodeId);
+      }
+    },
+    [selectNode, selectedNodeId]
+  );
 
   return (
     <section
-      className={`canvas-shell ${getCanvasToolClassName(canvasTool)}`}
+      className={`canvas-shell canvas-shell--${variant} ${getCanvasToolClassName(canvasTool)}`}
       aria-label="Workflow canvas"
     >
       <ReactFlow
         colorMode="light"
         defaultEdgeOptions={defaultEdgeOptions}
-        defaultViewport={fixedViewport}
+        defaultViewport={fixedViewports[variant]}
         edges={edges}
+        fitView
+        fitViewOptions={fitViewOptions}
         isValidConnection={isValidConnection}
-        nodeTypes={nodeTypes}
+        nodeTypes={workflowNodeTypes}
         nodes={layoutNodes}
         nodesConnectable={false}
         nodesDraggable={false}
         onConnect={onConnect}
         onEdgesChange={onEdgesChange}
         onMoveEnd={(_, viewport) => setViewport(viewport)}
-        onNodeClick={(_, node) => selectNode(node.id)}
+        onNodeClick={(_, node) => updateSelectedNode(node.id)}
         onNodesChange={onNodesChange}
         onPaneClick={() => {
-          selectNode(undefined);
+          updateSelectedNode(undefined);
         }}
         onPaneContextMenu={(event) => event.preventDefault()}
-        panOnDrag
+        panOnDrag={variant === "full"}
         selectionOnDrag={false}
+        zoomOnDoubleClick={variant === "full"}
+        zoomOnPinch={variant === "full"}
+        zoomOnScroll={variant === "full"}
       >
-        <Background gap={24} />
-        <MiniMap pannable position="bottom-right" zoomable />
+        {variant === "full" ? <Background gap={24} /> : null}
+        {variant === "full" ? (
+          <MiniMap pannable position="bottom-right" zoomable />
+        ) : null}
       </ReactFlow>
     </section>
   );
 }
 
-function layoutHierarchy(nodes: EvalFlowNode[], edges: EvalFlowEdge[]) {
+function layoutHierarchy(
+  nodes: EvalFlowNode[],
+  edges: EvalFlowEdge[],
+  variant: WorkflowCanvasVariant,
+  selectedNodeId: string | undefined
+) {
+  const hierarchyLayout = hierarchyLayouts[variant];
   const nodeIndex = new Map(nodes.map((node, index) => [node.id, index]));
   const depthByNodeId = new Map<string, number>();
   const incomingCount = new Map(nodes.map((node) => [node.id, 0]));
@@ -167,6 +213,10 @@ function layoutHierarchy(nodes: EvalFlowNode[], edges: EvalFlowEdge[]) {
 
     return {
       ...node,
+      data: {
+        ...node.data,
+        isSelected: node.id === selectedNodeId
+      },
       draggable: false,
       position: {
         x: hierarchyLayout.startX + depth * hierarchyLayout.columnGap,
@@ -183,9 +233,10 @@ const EvalNode = memo(function EvalNode({
 }: NodeProps<EvalFlowNode>) {
   const definition = getNodeDefinition(type);
   const statusTone = statusToTone(data.status);
+  const isSelected = selected || data.isSelected === true;
 
   return (
-    <div className={`eval-node ${selected ? "eval-node--selected" : ""}`}>
+    <div className={`eval-node ${isSelected ? "eval-node--selected" : ""}`}>
       {definition?.inputs.map((input, index) => (
         <Handle
           className="eval-node__handle eval-node__handle--input"
@@ -226,6 +277,10 @@ const EvalNode = memo(function EvalNode({
     </div>
   );
 });
+
+const workflowNodeTypes = Object.fromEntries(
+  nodeDefinitions.map((definition) => [definition.type, EvalNode])
+);
 
 function handleTop(index: number, count: number) {
   return `${((index + 1) / (count + 1)) * 100}%`;
