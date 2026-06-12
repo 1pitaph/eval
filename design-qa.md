@@ -14,6 +14,7 @@ Scope:
 - Keep the local dev URL stable and support Vite hot updates on the fixed web port.
 - Pin local dev ports to web `8455` and API `8456`; `84555` is not usable because TCP ports must be 0-65535.
 - Align sidebar navigation icons to a fixed left edge across active and inactive items.
+- Remove the Inspector outer frame in pipeline layout and align its content with the top Setup title.
 
 Checks:
 - Desktop layout: passed. Pipeline spans the top; Inspector and Run Status render as left/right panels with no horizontal overflow.
@@ -28,6 +29,7 @@ Checks:
 - Dev server stability: passed. `http://localhost:8455/` remains reachable, Vite client is loaded, and browser console has no HMR errors.
 - API dev server: passed. `http://localhost:8456/health` returns healthy JSON.
 - Sidebar icon alignment: passed. Sidebar nav links compute `justify-content: flex-start`; all three icon left edges measured at the same x-coordinate.
+- Inspector unframed layout: passed. Inspector panel computes transparent background, 0px border, no shadow, and 0px radius; Setup title, Inspector title, and Inspector content all measure at the same left x-coordinate.
 - Build: passed with existing Vite chunk-size warning only.
 
 Final result: passed.

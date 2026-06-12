@@ -193,7 +193,8 @@ export function createApiProvider(input: ApiProviderInput): ApiProvider {
   const record: StoredApiProvider = {
     id: uniqueProviderId(input.label),
     label: input.label.trim(),
-    kind: input.kind,
+    protocol: input.protocol,
+    imageProvider: input.imageProvider,
     baseUrl: input.baseUrl.trim(),
     enabled: input.enabled,
     credential: credentialFromApiKey(input.apiKey),
@@ -224,7 +225,10 @@ export function updateApiProvider(
   const next: StoredApiProvider = {
     ...existing,
     ...(patch.label !== undefined ? { label: patch.label.trim() } : {}),
-    ...(patch.kind !== undefined ? { kind: patch.kind } : {}),
+    ...(patch.protocol !== undefined ? { protocol: patch.protocol } : {}),
+    ...(patch.imageProvider !== undefined
+      ? { imageProvider: patch.imageProvider }
+      : {}),
     ...(patch.baseUrl !== undefined ? { baseUrl: patch.baseUrl.trim() } : {}),
     ...(patch.docsUrl !== undefined ? { docsUrl: patch.docsUrl } : {}),
     ...(patch.enabled !== undefined ? { enabled: patch.enabled } : {}),
@@ -288,9 +292,10 @@ function seedDefaultApiProviders() {
   const now = new Date().toISOString();
   const defaults: StoredApiProvider[] = [
     {
-      id: "openai",
-      label: "OpenAI",
-      kind: "openai",
+      id: "openai-responses",
+      label: "OpenAI Responses",
+      protocol: "openai-responses",
+      imageProvider: "openai",
       baseUrl: "https://api.openai.com/v1",
       docsUrl: "https://platform.openai.com/docs",
       enabled: true,
@@ -309,65 +314,28 @@ function seedDefaultApiProviders() {
       updatedAt: now
     },
     {
-      id: "google-imagen",
-      label: "Google Imagen",
-      kind: "google-imagen",
-      baseUrl: "https://generativelanguage.googleapis.com/v1beta",
-      docsUrl: "https://ai.google.dev/gemini-api/docs/image-generation",
-      enabled: true,
+      id: "openai-chat-completions",
+      label: "OpenAI Chat Completions",
+      protocol: "openai-chat-completions",
+      imageProvider: "openai",
+      baseUrl: "https://api.openai.com/v1",
+      docsUrl: "https://platform.openai.com/docs/api-reference/chat/create",
+      enabled: false,
       credential: { status: "not_configured" },
-      models: [
-        {
-          id: "imagen",
-          name: "Imagen",
-          enabled: true,
-          capabilities: ["image-generation"],
-          estimatedCostPerImageUsd: 0.038,
-          estimatedLatencyMs: 4700
-        }
-      ],
+      models: [],
       createdAt: now,
       updatedAt: now
     },
     {
-      id: "fal",
-      label: "fal.ai",
-      kind: "fal",
-      baseUrl: "https://fal.run",
-      docsUrl: "https://fal.ai/docs",
-      enabled: true,
+      id: "anthropic-messages",
+      label: "Anthropic Messages",
+      protocol: "anthropic-messages",
+      imageProvider: "custom",
+      baseUrl: "https://api.anthropic.com/v1",
+      docsUrl: "https://docs.anthropic.com/en/api/messages",
+      enabled: false,
       credential: { status: "not_configured" },
-      models: [
-        {
-          id: "flux",
-          name: "FLUX",
-          enabled: true,
-          capabilities: ["image-generation"],
-          estimatedCostPerImageUsd: 0.024,
-          estimatedLatencyMs: 3100
-        }
-      ],
-      createdAt: now,
-      updatedAt: now
-    },
-    {
-      id: "replicate",
-      label: "Replicate",
-      kind: "replicate",
-      baseUrl: "https://api.replicate.com/v1",
-      docsUrl: "https://replicate.com/docs",
-      enabled: true,
-      credential: { status: "not_configured" },
-      models: [
-        {
-          id: "sdxl",
-          name: "SDXL",
-          enabled: true,
-          capabilities: ["image-generation"],
-          estimatedCostPerImageUsd: 0.016,
-          estimatedLatencyMs: 5600
-        }
-      ],
+      models: [],
       createdAt: now,
       updatedAt: now
     }
@@ -382,7 +350,8 @@ function redactApiProvider(provider: StoredApiProvider): ApiProvider {
   return {
     id: provider.id,
     label: provider.label,
-    kind: provider.kind,
+    protocol: provider.protocol,
+    imageProvider: provider.imageProvider,
     baseUrl: provider.baseUrl,
     enabled: provider.enabled,
     credential: provider.credential,

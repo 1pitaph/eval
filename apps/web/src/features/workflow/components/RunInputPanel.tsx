@@ -99,7 +99,7 @@ export function RunInputPanel() {
     "watermark, distorted text, unsafe content"
   );
   const availableModels = useMemo(
-    () => modelsFromProviders(providersQuery.data?.providers) ?? fallbackAvailableModels,
+    () => modelsFromProviders(providersQuery.data?.providers),
     [providersQuery.data?.providers]
   );
   const availableModelIds = useMemo(
@@ -654,35 +654,40 @@ function variablesFromTemplate(template: string) {
 
 function modelsFromProviders(
   providers: ApiProvider[] | undefined
-): AvailableModel[] | undefined {
-  if (!providers) {
-    return undefined;
-  }
-
+): AvailableModel[] {
   const seen = new Set<string>();
   const models: AvailableModel[] = [];
 
-  for (const provider of providers) {
-    if (!provider.enabled) {
-      continue;
-    }
-
-    for (const model of provider.models) {
-      if (
-        !model.enabled ||
-        !model.capabilities.includes("image-generation") ||
-        seen.has(model.id)
-      ) {
+  if (providers) {
+    for (const provider of providers) {
+      if (!provider.enabled) {
         continue;
       }
 
+      for (const model of provider.models) {
+        if (
+          !model.enabled ||
+          !model.capabilities.includes("image-generation") ||
+          seen.has(model.id)
+        ) {
+          continue;
+        }
+
+        seen.add(model.id);
+        models.push({
+          id: model.id,
+          name: model.name,
+          providerLabel: provider.label,
+          estimatedCostPerImageUsd: model.estimatedCostPerImageUsd
+        });
+      }
+    }
+  }
+
+  for (const model of fallbackAvailableModels) {
+    if (!seen.has(model.id)) {
       seen.add(model.id);
-      models.push({
-        id: model.id,
-        name: model.name,
-        providerLabel: provider.label,
-        estimatedCostPerImageUsd: model.estimatedCostPerImageUsd
-      });
+      models.push(model);
     }
   }
 

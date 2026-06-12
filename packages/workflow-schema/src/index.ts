@@ -529,12 +529,17 @@ export const ImageProviderSchema = z.enum([
   "imported"
 ]);
 
-export const ApiProviderKindSchema = z.enum([
+export const ApiProviderProtocolSchema = z.enum([
+  "openai-responses",
+  "openai-chat-completions",
+  "anthropic-messages"
+]);
+
+export const ApiProviderImageProviderSchema = z.enum([
   "openai",
   "google-imagen",
   "fal",
   "replicate",
-  "openai-compatible",
   "custom"
 ]);
 
@@ -572,7 +577,8 @@ export const ApiProviderCredentialSchema = z.object({
 export const ApiProviderSchema = z.object({
   id: z.string().min(1),
   label: z.string().min(1),
-  kind: ApiProviderKindSchema,
+  protocol: ApiProviderProtocolSchema,
+  imageProvider: ApiProviderImageProviderSchema.default("custom"),
   baseUrl: z.string().min(1),
   docsUrl: z.string().url().optional(),
   enabled: z.boolean().default(true),
@@ -584,7 +590,8 @@ export const ApiProviderSchema = z.object({
 
 export const ApiProviderInputSchema = z.object({
   label: z.string().min(1),
-  kind: ApiProviderKindSchema,
+  protocol: ApiProviderProtocolSchema,
+  imageProvider: ApiProviderImageProviderSchema.default("custom"),
   baseUrl: z.string().min(1),
   docsUrl: z.string().url().optional(),
   enabled: z.boolean().default(true),
@@ -596,7 +603,10 @@ export const ApiProviderPatchSchema = ApiProviderInputSchema.partial().extend({
   apiKey: z.string().optional()
 });
 
-export type ApiProviderKind = z.infer<typeof ApiProviderKindSchema>;
+export type ApiProviderProtocol = z.infer<typeof ApiProviderProtocolSchema>;
+export type ApiProviderImageProvider = z.infer<
+  typeof ApiProviderImageProviderSchema
+>;
 export type ApiProviderModelCapability = z.infer<
   typeof ApiProviderModelCapabilitySchema
 >;

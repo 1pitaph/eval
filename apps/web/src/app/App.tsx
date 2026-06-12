@@ -41,6 +41,7 @@ function StudioApp() {
     useState<StudioSidebarPanel>("setup");
   const activePanelMeta = sidebarPanels[activeSidebarPanel];
   const isProviderPanel = activeSidebarPanel === "providers";
+  const isSetupPanel = activeSidebarPanel === "setup";
   const showWorkflowActions = activeSidebarPanel !== "providers";
 
   const handleCompile = async () => {
@@ -106,7 +107,9 @@ function StudioApp() {
               className={`studio-dashboard ${
                 isProviderPanel
                   ? "studio-dashboard--providers"
-                  : "studio-dashboard--pipeline"
+                  : isSetupPanel
+                    ? "studio-dashboard--pipeline"
+                    : "studio-dashboard--without-canvas"
               }`}
             >
               {isProviderPanel ? (
@@ -118,10 +121,11 @@ function StudioApp() {
                 </section>
               ) : (
                 <>
-                  <section
-                    className="canvas-workbench canvas-workbench--pipeline"
-                    aria-label="Workflow pipeline"
-                  >
+                  {isSetupPanel ? (
+                    <section
+                      className="canvas-workbench canvas-workbench--pipeline"
+                      aria-label="Workflow pipeline"
+                    >
                       <Button
                         className="canvas-workbench__expand"
                         onClick={() => setCanvasOpen(true)}
@@ -135,7 +139,8 @@ function StudioApp() {
                     <div className="canvas-workbench__body">
                       <WorkflowCanvas variant="pipeline" />
                     </div>
-                  </section>
+                    </section>
+                  ) : null}
 
                   <section
                     className="workspace-panel"

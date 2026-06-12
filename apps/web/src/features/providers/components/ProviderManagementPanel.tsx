@@ -8,15 +8,16 @@ import {
   ServerCog,
   Trash2
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import type { QueryClient } from "@tanstack/react-query";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
   ApiProvider,
+  ApiProviderImageProvider,
   ApiProviderInput,
-  ApiProviderKind,
   ApiProviderModel,
-  ApiProviderPatch
+  ApiProviderPatch,
+  ApiProviderProtocol
 } from "@eval/workflow-schema";
 import {
   Badge,
@@ -36,7 +37,8 @@ import {
 
 type ProviderFormState = {
   label: string;
-  kind: ApiProviderKind;
+  protocol: ApiProviderProtocol;
+  imageProvider: ApiProviderImageProvider;
   baseUrl: string;
   docsUrl: string;
   enabled: boolean;
@@ -51,13 +53,30 @@ type NewModelState = {
   estimatedLatencyMs: number;
 };
 
-const providerKindOptions: Array<{ label: string; value: ApiProviderKind }> = [
-  { label: "OpenAI", value: "openai" },
-  { label: "Google Imagen", value: "google-imagen" },
-  { label: "fal.ai", value: "fal" },
-  { label: "Replicate", value: "replicate" },
-  { label: "OpenAI-compatible", value: "openai-compatible" },
-  { label: "Custom", value: "custom" }
+type ProviderFormDraft = {
+  sourceId: string;
+  form: ProviderFormState;
+  apiKeyTouched: boolean;
+};
+
+const providerProtocolOptions: Array<{
+  label: string;
+  value: ApiProviderProtocol;
+}> = [
+  { label: "OpenAI Responses-compatible", value: "openai-responses" },
+  { label: "OpenAI Chat Completions-compatible", value: "openai-chat-completions" },
+  { label: "Anthropic Messages-compatible", value: "anthropic-messages" }
+];
+
+const imageProviderOptions: Array<{
+  label: string;
+  value: ApiProviderImageProvider;
+}> = [
+  { label: "OpenAI image profile", value: "openai" },
+  { label: "Google Imagen profile", value: "google-imagen" },
+  { label: "fal.ai profile", value: "fal" },
+  { label: "Replicate profile", value: "replicate" },
+  { label: "Custom image profile", value: "custom" }
 ];
 
 const emptyModel: NewModelState = {
@@ -73,18 +92,56 @@ export function ProviderManagementPanel() {
     queryKey: ["api-providers"],
     queryFn: listApiProviders
   });
-  const providers = providersQuery.data?.providers ?? [];
+  const providers = useMemo(
+    () => providersQuery.data?.providers ?? [],
+    [providersQuery.data?.providers]
+  );
   const [selectedProviderId, setSelectedProviderId] = useState<string | undefined>();
   const [isCreating, setIsCreating] = useState(false);
   const [searchText, setSearchText] = useState("");
-  const [form, setForm] = useState<ProviderFormState>(newProviderForm());
+  const [formDraft, setFormDraft] = useState<ProviderFormDraft>(() => ({
+    sourceId: "new",
+    form: newProviderForm(),
+    apiKeyTouched: false
+  }));
   const [newModel, setNewModel] = useState<NewModelState>(emptyModel);
-  const [apiKeyTouched, setApiKeyTouched] = useState(false);
   const [statusMessage, setStatusMessage] = useState("Provider settings are local to this API server session.");
 
-  const selectedProvider = providers.find(
-    (provider) => provider.id === selectedProviderId
+  const selectedProvider =
+    providers.find((provider) => provider.id === selectedProviderId) ??
+    (isCreating ? undefined : providers[0]);
+  const formSourceId = isCreating ? "new" : selectedProvider?.id ?? "none";
+  const defaultForm = useMemo(
+    () =>
+      isCreating || !selectedProvider
+        ? newProviderForm()
+        : formFromProvider(selectedProvider),
+    [isCreating, selectedProvider]
   );
+  const form =
+    formDraft.sourceId === formSourceId ? formDraft.form : defaultForm;
+  const apiKeyTouched =
+    formDraft.sourceId === formSourceId ? formDraft.apiKeyTouched : false;
+  const setForm = (
+    updater: (current: ProviderFormState) => ProviderFormState
+  ) => {
+    setFormDraft((current) => {
+      const baseForm = current.sourceId === formSourceId ? current.form : defaultForm;
+      return {
+        sourceId: formSourceId,
+        form: updater(baseForm),
+        apiKeyTouched:
+          current.sourceId === formSourceId ? current.apiKeyTouched : false
+      };
+    });
+  };
+  const setApiKeyTouched = (nextApiKeyTouched: boolean) => {
+    setFormDraft((current) => ({
+      sourceId: formSourceId,
+      form: current.sourceId === formSourceId ? current.form : defaultForm,
+      apiKeyTouched: nextApiKeyTouched
+    }));
+  };
   const visibleProviders = useMemo(() => {
     const query = searchText.trim().toLowerCase();
     if (!query) {
@@ -94,7 +151,8 @@ export function ProviderManagementPanel() {
     return providers.filter((provider) => {
       const haystack = [
         provider.label,
-        provider.kind,
+        provider.protocol,
+        provider.imageProvider,
         provider.baseUrl,
         ...provider.models.flatMap((model) => [model.id, model.name])
       ]
@@ -104,43 +162,17 @@ export function ProviderManagementPanel() {
     });
   }, [providers, searchText]);
 
-  useEffect(() => {
-    if (isCreating) {
-      return;
-    }
-
-    if (!selectedProviderId && providers[0]) {
-      setSelectedProviderId(providers[0].id);
-      return;
-    }
-
-    if (
-      selectedProviderId &&
-      !providers.some((provider) => provider.id === selectedProviderId)
-    ) {
-      setSelectedProviderId(providers[0]?.id);
-    }
-  }, [isCreating, providers, selectedProviderId]);
-
-  useEffect(() => {
-    if (isCreating) {
-      setForm(newProviderForm());
-      setApiKeyTouched(false);
-      return;
-    }
-
-    if (selectedProvider) {
-      setForm(formFromProvider(selectedProvider));
-      setApiKeyTouched(false);
-    }
-  }, [isCreating, selectedProvider]);
-
   const createMutation = useMutation({
     mutationFn: createApiProvider,
     onSuccess: async ({ provider }) => {
       upsertProviderInCache(queryClient, provider);
       setStatusMessage(`${provider.label} has been added.`);
       setSelectedProviderId(provider.id);
+      setFormDraft({
+        sourceId: provider.id,
+        form: formFromProvider(provider),
+        apiKeyTouched: false
+      });
       setIsCreating(false);
       await queryClient.invalidateQueries({ queryKey: ["api-providers"] });
     },
@@ -152,6 +184,11 @@ export function ProviderManagementPanel() {
       updateApiProvider(id, patch),
     onSuccess: async ({ provider }) => {
       upsertProviderInCache(queryClient, provider);
+      setFormDraft({
+        sourceId: provider.id,
+        form: formFromProvider(provider),
+        apiKeyTouched: false
+      });
       setStatusMessage(`${provider.label} settings saved.`);
       await queryClient.invalidateQueries({ queryKey: ["api-providers"] });
     },
@@ -190,12 +227,25 @@ export function ProviderManagementPanel() {
   const saving = createMutation.isPending || updateMutation.isPending;
 
   const startCreate = () => {
+    setFormDraft({
+      sourceId: "new",
+      form: newProviderForm(),
+      apiKeyTouched: false
+    });
     setIsCreating(true);
     setSelectedProviderId(undefined);
     setStatusMessage("Add a provider, then save it to make its models available.");
   };
 
   const selectProvider = (providerId: string) => {
+    const provider = providers.find((candidate) => candidate.id === providerId);
+    if (provider) {
+      setFormDraft({
+        sourceId: provider.id,
+        form: formFromProvider(provider),
+        apiKeyTouched: false
+      });
+    }
     setIsCreating(false);
     setSelectedProviderId(providerId);
   };
@@ -304,7 +354,7 @@ export function ProviderManagementPanel() {
             {visibleProviders.map((provider) => (
               <button
                 className={`provider-list-item ${
-                  provider.id === selectedProviderId ? "is-active" : ""
+                  provider.id === selectedProvider?.id ? "is-active" : ""
                 }`}
                 key={provider.id}
                 onClick={() => selectProvider(provider.id)}
@@ -317,7 +367,7 @@ export function ProviderManagementPanel() {
                   <strong>{provider.label}</strong>
                   <small>
                     {provider.models.filter((model) => model.enabled).length} models
-                    · {provider.kind}
+                    · {protocolLabel(provider.protocol)}
                   </small>
                 </span>
                 <span
@@ -422,16 +472,29 @@ export function ProviderManagementPanel() {
                   />
                 </label>
                 <label className="provider-field">
-                  Provider type
+                  Protocol
                   <SelectControl
-                    onValueChange={(kind) =>
+                    onValueChange={(protocol) =>
                       setForm((current) => ({
                         ...current,
-                        kind: kind as ApiProviderKind
+                        protocol: protocol as ApiProviderProtocol
                       }))
                     }
-                    options={providerKindOptions}
-                    value={form.kind}
+                    options={providerProtocolOptions}
+                    value={form.protocol}
+                  />
+                </label>
+                <label className="provider-field">
+                  Image eval profile
+                  <SelectControl
+                    onValueChange={(imageProvider) =>
+                      setForm((current) => ({
+                        ...current,
+                        imageProvider: imageProvider as ApiProviderImageProvider
+                      }))
+                    }
+                    options={imageProviderOptions}
+                    value={form.imageProvider}
                   />
                 </label>
                 <label className="provider-field provider-field--wide">
@@ -653,13 +716,14 @@ function providerSubtitle(provider: ApiProvider | undefined, isCreating: boolean
     return "Select a provider to edit its API settings.";
   }
 
-  return `${provider.kind} · ${provider.baseUrl}`;
+  return `${protocolLabel(provider.protocol)} · ${provider.baseUrl}`;
 }
 
 function formFromProvider(provider: ApiProvider): ProviderFormState {
   return {
     label: provider.label,
-    kind: provider.kind,
+    protocol: provider.protocol,
+    imageProvider: provider.imageProvider,
     baseUrl: provider.baseUrl,
     docsUrl: provider.docsUrl ?? "",
     enabled: provider.enabled,
@@ -671,7 +735,8 @@ function formFromProvider(provider: ApiProvider): ProviderFormState {
 function newProviderForm(): ProviderFormState {
   return {
     label: "Custom Provider",
-    kind: "openai-compatible",
+    protocol: "openai-chat-completions",
+    imageProvider: "custom",
     baseUrl: "https://api.example.com/v1",
     docsUrl: "",
     enabled: false,
@@ -692,7 +757,8 @@ function newProviderForm(): ProviderFormState {
 function providerInputFromForm(form: ProviderFormState): ApiProviderInput {
   const input: ApiProviderInput = {
     label: form.label.trim(),
-    kind: form.kind,
+    protocol: form.protocol,
+    imageProvider: form.imageProvider,
     baseUrl: form.baseUrl.trim(),
     enabled: form.enabled,
     models: normalizeModels(form.models)
@@ -715,7 +781,8 @@ function providerPatchFromForm(
 ): ApiProviderPatch {
   const patch: ApiProviderPatch = {
     label: form.label.trim(),
-    kind: form.kind,
+    protocol: form.protocol,
+    imageProvider: form.imageProvider,
     baseUrl: form.baseUrl.trim(),
     enabled: form.enabled,
     models: normalizeModels(form.models)
@@ -762,6 +829,17 @@ function enabledImageModelCount(models: ApiProviderModel[]) {
   return models.filter(
     (model) => model.enabled && model.capabilities.includes("image-generation")
   ).length;
+}
+
+function protocolLabel(protocol: ApiProviderProtocol) {
+  switch (protocol) {
+    case "openai-responses":
+      return "OpenAI Responses";
+    case "openai-chat-completions":
+      return "OpenAI Chat Completions";
+    case "anthropic-messages":
+      return "Anthropic Messages";
+  }
 }
 
 function messageFromError(error: unknown) {

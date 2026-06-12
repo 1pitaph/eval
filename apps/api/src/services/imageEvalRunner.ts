@@ -401,7 +401,7 @@ function providerFromModel(
 ): ImageProvider {
   const configured = findConfiguredModel(model, apiProviders);
   if (configured) {
-    return imageProviderFromApiKind(configured.provider.kind);
+    return configured.provider.imageProvider;
   }
 
   const normalized = model.toLowerCase();
@@ -457,22 +457,6 @@ function findConfiguredModel(model: string, apiProviders: ApiProvider[]) {
   }
 
   return undefined;
-}
-
-function imageProviderFromApiKind(kind: ApiProvider["kind"]): ImageProvider {
-  switch (kind) {
-    case "openai":
-      return "openai";
-    case "google-imagen":
-      return "google-imagen";
-    case "fal":
-      return "fal";
-    case "replicate":
-      return "replicate";
-    case "openai-compatible":
-    case "custom":
-      return "custom";
-  }
 }
 
 function renderPrompt(template: string, prompt: string) {
