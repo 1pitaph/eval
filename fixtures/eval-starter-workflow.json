@@ -1,0 +1,216 @@
+{
+  "name": "Image generation bake-off",
+  "description": "Compare image models with automatic metrics and human review.",
+  "version": 1,
+  "nodes": [
+    {
+      "id": "prompt-set",
+      "type": "dataset.prompt_set",
+      "position": {
+        "x": 0,
+        "y": 120
+      },
+      "data": {
+        "label": "Prompt Set",
+        "status": "idle",
+        "config": {
+          "inputUiMode": "single",
+          "mode": "inline",
+          "datasetId": "inline-run-input",
+          "sampleLimit": 1,
+          "inlinePrompts": [
+            {
+              "id": "prompt-1",
+              "prompt": "A premium running shoe hero image on a clean studio background with readable launch text",
+              "tags": ["single"],
+              "referenceImages": []
+            }
+          ],
+          "referenceImages": []
+        }
+      }
+    },
+    {
+      "id": "prompt-template",
+      "type": "prompt.template",
+      "position": {
+        "x": 380,
+        "y": 120
+      },
+      "data": {
+        "label": "Prompt Template",
+        "status": "idle",
+        "config": {
+          "template": "{{prompt}}\nDirection: commercial-ready, brand-safe, no watermark."
+        }
+      }
+    },
+    {
+      "id": "model-fanout",
+      "type": "generation.model_fanout",
+      "position": {
+        "x": 760,
+        "y": 120
+      },
+      "data": {
+        "label": "Model Fanout",
+        "status": "idle",
+        "config": {
+          "models": ["gpt-image", "imagen", "flux", "sdxl"],
+          "samplesPerPrompt": 2,
+          "seedStrategy": "fixed_by_prompt",
+          "budgetUsd": 50
+        }
+      }
+    },
+    {
+      "id": "artifact-store",
+      "type": "artifact.store",
+      "position": {
+        "x": 1140,
+        "y": 120
+      },
+      "data": {
+        "label": "Artifact Store",
+        "status": "idle",
+        "config": {
+          "bucket": "oss://eval-artifacts",
+          "retentionDays": 90
+        }
+      }
+    },
+    {
+      "id": "auto-metrics",
+      "type": "metric.auto_image",
+      "position": {
+        "x": 1520,
+        "y": 40
+      },
+      "data": {
+        "label": "Auto Metrics",
+        "status": "idle",
+        "config": {
+          "metrics": [
+            "vlm_rubric",
+            "clip_siglip",
+            "ocr",
+            "nsfw",
+            "blur",
+            "aesthetic",
+            "cost",
+            "latency"
+          ],
+          "budgetUsd": 12
+        }
+      }
+    },
+    {
+      "id": "human-eval",
+      "type": "human.pairwise",
+      "position": {
+        "x": 1520,
+        "y": 220
+      },
+      "data": {
+        "label": "Human Eval",
+        "status": "idle",
+        "config": {
+          "sampleRate": 0.2,
+          "reviewersPerTask": 3,
+          "blindMode": true
+        }
+      }
+    },
+    {
+      "id": "aggregate",
+      "type": "aggregate.model_scores",
+      "position": {
+        "x": 1900,
+        "y": 120
+      },
+      "data": {
+        "label": "Aggregate",
+        "status": "idle",
+        "config": {
+          "rankingMethod": "elo"
+        }
+      }
+    },
+    {
+      "id": "release-gate",
+      "type": "decision.release_gate",
+      "position": {
+        "x": 2280,
+        "y": 120
+      },
+      "data": {
+        "label": "Release Gate",
+        "status": "idle",
+        "config": {
+          "baselineRunId": "baseline-current-prod",
+          "minHumanWinRate": 0.55,
+          "maxCostIncreasePct": 20,
+          "safetyMustPass": true
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "prompt-set-to-template",
+      "source": "prompt-set",
+      "sourceHandle": "prompts",
+      "target": "prompt-template",
+      "targetHandle": "prompts"
+    },
+    {
+      "id": "template-to-fanout",
+      "source": "prompt-template",
+      "sourceHandle": "rendered",
+      "target": "model-fanout",
+      "targetHandle": "prompts"
+    },
+    {
+      "id": "fanout-to-store",
+      "source": "model-fanout",
+      "sourceHandle": "images",
+      "target": "artifact-store",
+      "targetHandle": "artifacts"
+    },
+    {
+      "id": "store-to-metrics",
+      "source": "artifact-store",
+      "sourceHandle": "stored",
+      "target": "auto-metrics",
+      "targetHandle": "artifacts"
+    },
+    {
+      "id": "store-to-human",
+      "source": "artifact-store",
+      "sourceHandle": "stored",
+      "target": "human-eval",
+      "targetHandle": "artifacts"
+    },
+    {
+      "id": "metrics-to-aggregate",
+      "source": "auto-metrics",
+      "sourceHandle": "scores",
+      "target": "aggregate",
+      "targetHandle": "scores"
+    },
+    {
+      "id": "human-to-aggregate",
+      "source": "human-eval",
+      "sourceHandle": "annotations",
+      "target": "aggregate",
+      "targetHandle": "annotations"
+    },
+    {
+      "id": "aggregate-to-gate",
+      "source": "aggregate",
+      "sourceHandle": "report",
+      "target": "release-gate",
+      "targetHandle": "report"
+    }
+  ]
+}

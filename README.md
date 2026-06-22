@@ -6,6 +6,7 @@ The repository keeps only the self-developed platform in the monorepo:
 
 - `apps/web`: React Flow based Eval Studio.
 - `apps/api`: Eval Core API, workflow compiler, run orchestration boundary.
+- `apps/desktop`: Electron shell for the macOS-first desktop app.
 - `packages/workflow-schema`: shared workflow DSL, node catalog, validation types.
 - `packages/ui`: shared React primitives used by internal apps.
 - `workers/*`: generation, metric, human-eval sync, and report workers.
@@ -27,8 +28,27 @@ Useful checks:
 ```bash
 pnpm typecheck
 pnpm lint
+pnpm test
 pnpm build
+pnpm format
 ```
+
+Desktop app checks:
+
+```bash
+pnpm dev:desktop
+pnpm build:desktop
+pnpm dist:desktop
+pnpm dist:desktop:release
+```
+
+The Electron desktop app starts a private loopback API server, stores desktop
+data in the OS user-data directory, and encrypts provider API keys with the
+platform secure storage exposed by Electron. `pnpm dist:desktop` produces a
+local unsigned macOS build. `pnpm dist:desktop:release` uses the signed release
+configuration, requires `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, and
+`APPLE_TEAM_ID`, and publishes update metadata through GitHub Releases when
+GitHub publishing credentials are present.
 
 ## Config-as-Code Runner
 
@@ -44,7 +64,7 @@ UI:
 
 ```bash
 pnpm --filter @eval/api eval:run -- \
-  --input ./eval-spec.json \
+  --input ./fixtures/eval-starter-workflow.json \
   --output ./eval-run.json
 ```
 

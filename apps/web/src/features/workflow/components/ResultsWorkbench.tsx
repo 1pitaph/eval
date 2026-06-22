@@ -1048,6 +1048,7 @@ function buildImportedRun(rows: Array<Record<string, unknown>>): EvalRunRecord {
   return {
     id: runId,
     createdAt,
+    updatedAt: createdAt,
     status: "succeeded",
     spec,
     summary: {
@@ -1063,6 +1064,7 @@ function buildImportedRun(rows: Array<Record<string, unknown>>): EvalRunRecord {
       ),
       bestModel
     },
+    tasks: [],
     jobs: [],
     artifacts,
     scores,

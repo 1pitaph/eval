@@ -10,7 +10,7 @@ const BREAKPOINTS = {
   lg: 1024,
   md: 800,
   sm: 640,
-  xl: 1280,
+  xl: 1280
 } as const;
 
 type Breakpoint = keyof typeof BREAKPOINTS;
@@ -30,9 +30,7 @@ function resolveMax(value: Breakpoint | number): string {
   return `(max-width: ${px - 1}px)`;
 }
 
-function parseQuery(
-  query: BreakpointQuery | MediaQueryInput | (string & {}),
-): string {
+function parseQuery(query: BreakpointQuery | MediaQueryInput | (string & {})): string {
   if (typeof query !== "string") {
     const parts: string[] = [];
     if (query.min != null) parts.push(resolveMin(query.min));
@@ -70,7 +68,7 @@ export type MediaQueryInput = {
 };
 
 export function useMediaQuery(
-  query: BreakpointQuery | MediaQueryInput | (string & {}),
+  query: BreakpointQuery | MediaQueryInput | (string & {})
 ): boolean {
   const mediaQuery = parseQuery(query);
 
@@ -81,7 +79,7 @@ export function useMediaQuery(
       mql.addEventListener("change", callback);
       return () => mql.removeEventListener("change", callback);
     },
-    [mediaQuery],
+    [mediaQuery]
   );
 
   const getSnapshot = useCallback(() => {

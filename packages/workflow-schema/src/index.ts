@@ -551,6 +551,18 @@ export const ApiProviderModelCapabilitySchema = z.enum([
   "embedding"
 ]);
 
+export const apiProviderModelTypes = [
+  "image",
+  "text",
+  "vision",
+  "embedding",
+  "audio",
+  "rerank",
+  "other"
+] as const;
+
+export const ApiProviderModelTypeSchema = z.enum(apiProviderModelTypes);
+
 export const ApiProviderCredentialStatusSchema = z.enum([
   "not_configured",
   "configured",
@@ -562,6 +574,8 @@ export const ApiProviderModelSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1),
   enabled: z.boolean().default(true),
+  vendor: z.string().min(1).optional(),
+  type: ApiProviderModelTypeSchema.optional(),
   capabilities: z.array(ApiProviderModelCapabilitySchema).default(["image-generation"]),
   estimatedCostPerImageUsd: z.number().nonnegative().default(0.03),
   estimatedLatencyMs: z.number().int().nonnegative().default(4000)
@@ -604,12 +618,11 @@ export const ApiProviderPatchSchema = ApiProviderInputSchema.partial().extend({
 });
 
 export type ApiProviderProtocol = z.infer<typeof ApiProviderProtocolSchema>;
-export type ApiProviderImageProvider = z.infer<
-  typeof ApiProviderImageProviderSchema
->;
+export type ApiProviderImageProvider = z.infer<typeof ApiProviderImageProviderSchema>;
 export type ApiProviderModelCapability = z.infer<
   typeof ApiProviderModelCapabilitySchema
 >;
+export type ApiProviderModelType = z.infer<typeof ApiProviderModelTypeSchema>;
 export type ApiProviderCredentialStatus = z.infer<
   typeof ApiProviderCredentialStatusSchema
 >;
@@ -618,6 +631,134 @@ export type ApiProviderCredential = z.infer<typeof ApiProviderCredentialSchema>;
 export type ApiProvider = z.infer<typeof ApiProviderSchema>;
 export type ApiProviderInput = z.infer<typeof ApiProviderInputSchema>;
 export type ApiProviderPatch = z.infer<typeof ApiProviderPatchSchema>;
+
+export function inferApiProviderModelVendor(
+  id: string,
+  name = "",
+  explicitVendor?: string
+) {
+  const cleanedVendor = explicitVendor?.trim();
+  if (cleanedVendor) {
+    return titleCaseProvider(cleanedVendor);
+  }
+
+  const haystack = `${id} ${name}`.toLowerCase();
+  const matchers: Array<[string, string[]]> = [
+    ["OpenAI", ["gpt-", "o1", "o3", "o4", "dall-e", "codex"]],
+    ["Anthropic", ["claude"]],
+    ["Google", ["gemini", "imagen", "veo", "palm"]],
+    ["DeepSeek", ["deepseek"]],
+    ["Alibaba", ["qwen", "qwq"]],
+    ["Moonshot", ["kimi", "moonshot"]],
+    ["Meta", ["llama", "meta-"]],
+    ["Mistral", ["mistral", "mixtral", "codestral"]],
+    ["xAI", ["grok", "xai"]],
+    ["Cohere", ["command", "cohere"]],
+    ["Stability AI", ["stable-diffusion", "stable-image", "sdxl"]],
+    ["Black Forest Labs", ["flux", "black-forest"]],
+    ["Midjourney", ["midjourney"]],
+    ["MiniMax", ["minimax"]],
+    ["Baidu", ["ernie", "wenxin"]],
+    ["Tencent", ["hunyuan"]],
+    ["Zhipu", ["glm", "zhipu"]],
+    ["ByteDance", ["doubao"]]
+  ];
+
+  return (
+    matchers.find(([, needles]) =>
+      needles.some((needle) => haystack.includes(needle))
+    )?.[0] ?? "Unknown"
+  );
+}
+
+export function inferApiProviderModelType(
+  id: string,
+  name = "",
+  explicitType?: string
+): ApiProviderModelType {
+  const normalizedExplicit = explicitType?.trim().toLowerCase();
+  const explicitMatch = apiProviderModelTypes.find(
+    (candidate) => candidate === normalizedExplicit
+  );
+  if (explicitMatch) {
+    return explicitMatch;
+  }
+
+  const haystack = `${id} ${name}`.toLowerCase();
+  if (containsAny(haystack, ["embed", "embedding"])) {
+    return "embedding";
+  }
+  if (containsAny(haystack, ["rerank", "reranker"])) {
+    return "rerank";
+  }
+  if (containsAny(haystack, ["whisper", "tts", "audio", "speech", "voice"])) {
+    return "audio";
+  }
+  if (
+    containsAny(haystack, [
+      "image",
+      "dall-e",
+      "imagen",
+      "flux",
+      "sdxl",
+      "stable-diffusion",
+      "stable-image",
+      "midjourney"
+    ])
+  ) {
+    return "image";
+  }
+  if (containsAny(haystack, ["vision", "-vl", "vl-", "video", "veo"])) {
+    return "vision";
+  }
+
+  return "text";
+}
+
+export function apiProviderCapabilitiesForModelType(
+  modelType: ApiProviderModelType
+): ApiProviderModelCapability[] {
+  switch (modelType) {
+    case "image":
+      return ["image-generation"];
+    case "vision":
+      return ["vision", "text-generation"];
+    case "embedding":
+      return ["embedding"];
+    case "audio":
+    case "rerank":
+    case "other":
+    case "text":
+      return ["text-generation"];
+  }
+}
+
+function containsAny(value: string, needles: string[]) {
+  return needles.some((needle) => value.includes(needle));
+}
+
+function titleCaseProvider(value: string) {
+  const lower = value.toLowerCase();
+  const known: Record<string, string> = {
+    openai: "OpenAI",
+    anthropic: "Anthropic",
+    google: "Google",
+    deepseek: "DeepSeek",
+    qwen: "Alibaba",
+    alibaba: "Alibaba",
+    moonshot: "Moonshot",
+    meta: "Meta",
+    mistral: "Mistral",
+    xai: "xAI",
+    cohere: "Cohere"
+  };
+  return (
+    known[lower] ??
+    value
+      .replace(/[-_]+/g, " ")
+      .replace(/\b\w/g, (letter) => letter.toUpperCase())
+  );
+}
 
 export const ImageMetricSchema = z.enum([
   "vlm_rubric",
@@ -632,7 +773,54 @@ export const ImageMetricSchema = z.enum([
 
 export const ReviewVerdictSchema = z.enum(["pass", "fail", "needs_review"]);
 
-export const EvalRunStatusSchema = z.enum(["queued", "running", "succeeded", "failed"]);
+export const EvalRunStatusSchema = z.enum([
+  "queued",
+  "running",
+  "waiting_human",
+  "succeeded",
+  "failed",
+  "canceled"
+]);
+
+export const EvalTaskKindSchema = z.enum([
+  "generation",
+  "metric",
+  "human_review",
+  "aggregation",
+  "release_gate"
+]);
+
+export const EvalTaskStatusSchema = z.enum([
+  "queued",
+  "running",
+  "succeeded",
+  "failed",
+  "canceled"
+]);
+
+export const EvalTaskErrorSchema = z.object({
+  code: z.string().min(1),
+  message: z.string().min(1),
+  retryable: z.boolean().default(true),
+  details: z.record(z.string(), z.unknown()).optional()
+});
+
+export const EvalTaskRecordSchema = z.object({
+  id: z.string().min(1),
+  runId: z.string().min(1),
+  nodeId: z.string().min(1),
+  kind: EvalTaskKindSchema,
+  status: EvalTaskStatusSchema,
+  attempt: z.number().int().nonnegative().default(0),
+  maxAttempts: z.number().int().positive().default(3),
+  input: z.record(z.string(), z.unknown()).default({}),
+  output: z.record(z.string(), z.unknown()).optional(),
+  error: EvalTaskErrorSchema.optional(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
+  startedAt: z.string().datetime().optional(),
+  completedAt: z.string().datetime().optional()
+});
 
 export const ImageGenerationJobSchema = z.object({
   id: z.string().min(1),
@@ -898,9 +1086,11 @@ export const EvalRunSummarySchema = z.object({
 export const EvalRunRecordSchema = z.object({
   id: z.string().min(1),
   createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime().optional(),
   status: EvalRunStatusSchema,
   spec: EvalRunSpecSchema,
   summary: EvalRunSummarySchema,
+  tasks: z.array(EvalTaskRecordSchema).default([]),
   jobs: z.array(ImageGenerationJobSchema),
   artifacts: z.array(ImageArtifactSchema),
   scores: z.array(ImageScoreSchema),
@@ -916,6 +1106,10 @@ export type ImageProvider = z.infer<typeof ImageProviderSchema>;
 export type ImageMetric = z.infer<typeof ImageMetricSchema>;
 export type ReviewVerdict = z.infer<typeof ReviewVerdictSchema>;
 export type EvalRunStatus = z.infer<typeof EvalRunStatusSchema>;
+export type EvalTaskKind = z.infer<typeof EvalTaskKindSchema>;
+export type EvalTaskStatus = z.infer<typeof EvalTaskStatusSchema>;
+export type EvalTaskError = z.infer<typeof EvalTaskErrorSchema>;
+export type EvalTaskRecord = z.infer<typeof EvalTaskRecordSchema>;
 export type ImageGenerationJob = z.infer<typeof ImageGenerationJobSchema>;
 export type ImageArtifact = z.infer<typeof ImageArtifactSchema>;
 export type ImageScore = z.infer<typeof ImageScoreSchema>;

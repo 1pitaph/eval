@@ -3,6 +3,7 @@
 Reference: user-provided Eval Studio layout screenshot.
 
 Scope:
+
 - Move the workflow pipeline into a top horizontal React Flow strip.
 - Render the top pipeline as an unframed fixed strip without canvas background, inner border, or card frame.
 - Remove the visible Pipeline Map label/header so only the fixed node strip remains.
@@ -17,6 +18,7 @@ Scope:
 - Remove the Inspector outer frame in pipeline layout and align its content with the top Setup title.
 
 Checks:
+
 - Desktop layout: passed. Pipeline spans the top; Inspector and Run Status render as left/right panels with no horizontal overflow.
 - Unframed pipeline: passed. Pipeline container and React Flow shell render transparent with no border, no shadow, and no dot-grid background.
 - Pipeline header removal: passed. The page no longer contains visible Pipeline Map text and the pipeline header row is not rendered.

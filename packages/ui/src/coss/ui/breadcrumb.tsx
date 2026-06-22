@@ -21,7 +21,7 @@ export function BreadcrumbList({
     <ol
       className={cn(
         "wrap-break-word flex flex-wrap items-center gap-1.5 text-muted-foreground text-sm sm:gap-2.5",
-        className,
+        className
       )}
       data-slot="breadcrumb-list"
       {...props}
@@ -49,13 +49,13 @@ export function BreadcrumbLink({
 }: useRender.ComponentProps<"a">): React.ReactElement {
   const defaultProps = {
     className: cn("transition-colors hover:text-foreground", className),
-    "data-slot": "breadcrumb-link",
+    "data-slot": "breadcrumb-link"
   };
 
   return useRender({
     defaultTagName: "a",
     props: mergeProps<"a">(defaultProps, props),
-    render,
+    render
   });
 }
 

@@ -15,8 +15,7 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
   const webPort = numberFromEnv(env.WEB_PORT ?? env.PORT, 8455);
   const apiPort = numberFromEnv(env.API_PORT, 8456);
-  const apiProxyTarget =
-    env.VITE_API_PROXY_TARGET ?? `http://localhost:${apiPort}`;
+  const apiProxyTarget = env.VITE_API_PROXY_TARGET ?? `http://localhost:${apiPort}`;
 
   return {
     plugins: [react(), tailwindcss()],

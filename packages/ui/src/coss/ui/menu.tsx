@@ -19,11 +19,7 @@ export function MenuTrigger({
   ...props
 }: MenuPrimitive.Trigger.Props): React.ReactElement {
   return (
-    <MenuPrimitive.Trigger
-      className={className}
-      data-slot="menu-trigger"
-      {...props}
-    >
+    <MenuPrimitive.Trigger className={className} data-slot="menu-trigger" {...props}>
       {children}
     </MenuPrimitive.Trigger>
   );
@@ -61,7 +57,7 @@ export function MenuPopup({
         <MenuPrimitive.Popup
           className={cn(
             "relative flex not-[class*='w-']:min-w-32 origin-(--transform-origin) rounded-lg border bg-popover not-dark:bg-clip-padding shadow-lg/5 outline-none before:pointer-events-none before:absolute before:inset-0 before:rounded-[calc(var(--radius-lg)-1px)] before:shadow-[0_1px_--theme(--color-black/4%)] focus:outline-none dark:before:shadow-[0_-1px_--theme(--color-white/6%)]",
-            className,
+            className
           )}
           data-slot="menu-popup"
           {...props}
@@ -75,9 +71,7 @@ export function MenuPopup({
   );
 }
 
-export function MenuGroup(
-  props: MenuPrimitive.Group.Props,
-): React.ReactElement {
+export function MenuGroup(props: MenuPrimitive.Group.Props): React.ReactElement {
   return <MenuPrimitive.Group data-slot="menu-group" {...props} />;
 }
 
@@ -94,7 +88,7 @@ export function MenuItem({
     <MenuPrimitive.Item
       className={cn(
         "flex min-h-8 cursor-default select-none items-center gap-2 rounded-sm px-2 py-1 text-base text-foreground outline-none data-disabled:pointer-events-none data-highlighted:bg-accent data-inset:ps-8 data-[variant=destructive]:text-destructive-foreground data-highlighted:text-accent-foreground data-disabled:opacity-64 sm:min-h-7 sm:text-sm [&>svg:not([class*='opacity-'])]:opacity-80 [&>svg:not([class*='size-'])]:size-4.5 sm:[&>svg:not([class*='size-'])]:size-4 [&>svg]:pointer-events-none [&>svg]:-mx-0.5 [&>svg]:shrink-0",
-        className,
+        className
       )}
       data-inset={inset}
       data-slot="menu-item"
@@ -121,7 +115,7 @@ export function MenuCheckboxItem({
         variant === "switch"
           ? "grid-cols-[1fr_auto] gap-4 pe-1.5"
           : "grid-cols-[.75rem_1fr] pe-4",
-        className,
+        className
       )}
       data-slot="menu-checkbox-item"
       {...props}
@@ -162,7 +156,7 @@ export function MenuCheckboxItem({
 }
 
 export function MenuRadioGroup(
-  props: MenuPrimitive.RadioGroup.Props,
+  props: MenuPrimitive.RadioGroup.Props
 ): React.ReactElement {
   return <MenuPrimitive.RadioGroup data-slot="menu-radio-group" {...props} />;
 }
@@ -176,7 +170,7 @@ export function MenuRadioItem({
     <MenuPrimitive.RadioItem
       className={cn(
         "grid min-h-8 in-data-[side=none]:min-w-[calc(var(--anchor-width)+1.25rem)] cursor-default grid-cols-[.75rem_1fr] items-center gap-2 rounded-sm py-1 ps-2 pe-4 text-base text-foreground outline-none data-disabled:pointer-events-none data-highlighted:bg-accent data-highlighted:text-accent-foreground data-disabled:opacity-64 sm:min-h-7 sm:text-sm [&_svg:not([class*='size-'])]:size-4.5 sm:[&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:shrink-0",
-        className,
+        className
       )}
       data-slot="menu-radio-item"
       {...props}
@@ -213,7 +207,7 @@ export function MenuGroupLabel({
     <MenuPrimitive.GroupLabel
       className={cn(
         "px-2 py-1.5 font-medium text-muted-foreground text-xs data-inset:ps-9 sm:data-inset:ps-8",
-        className,
+        className
       )}
       data-inset={inset}
       data-slot="menu-label"
@@ -243,7 +237,7 @@ export function MenuShortcut({
     <kbd
       className={cn(
         "ms-auto font-medium font-sans text-muted-foreground/72 text-xs tracking-widest",
-        className,
+        className
       )}
       data-slot="menu-shortcut"
       {...props}
@@ -251,9 +245,7 @@ export function MenuShortcut({
   );
 }
 
-export function MenuSub(
-  props: MenuPrimitive.SubmenuRoot.Props,
-): React.ReactElement {
+export function MenuSub(props: MenuPrimitive.SubmenuRoot.Props): React.ReactElement {
   return <MenuPrimitive.SubmenuRoot data-slot="menu-sub" {...props} />;
 }
 
@@ -269,7 +261,7 @@ export function MenuSubTrigger({
     <MenuPrimitive.SubmenuTrigger
       className={cn(
         "flex min-h-8 items-center gap-2 rounded-sm px-2 py-1 text-base text-foreground outline-none data-disabled:pointer-events-none data-highlighted:bg-accent data-popup-open:bg-accent data-inset:ps-8 data-highlighted:text-accent-foreground data-popup-open:text-accent-foreground data-disabled:opacity-64 sm:min-h-7 sm:text-sm [&>svg:not(:last-child)]:-mx-0.5 [&_svg:not([class*='size-'])]:size-4.5 sm:[&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none",
-        className,
+        className
       )}
       data-inset={inset}
       data-slot="menu-sub-trigger"
@@ -324,5 +316,5 @@ export {
   MenuShortcut as DropdownMenuShortcut,
   MenuSub as DropdownMenuSub,
   MenuSubTrigger as DropdownMenuSubTrigger,
-  MenuSubPopup as DropdownMenuSubContent,
+  MenuSubPopup as DropdownMenuSubContent
 };

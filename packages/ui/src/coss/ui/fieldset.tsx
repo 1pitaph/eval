@@ -10,11 +10,7 @@ export function Fieldset({
   ...props
 }: FieldsetPrimitive.Root.Props): React.ReactElement {
   return (
-    <FieldsetPrimitive.Root
-      className={className}
-      data-slot="fieldset"
-      {...props}
-    />
+    <FieldsetPrimitive.Root className={className} data-slot="fieldset" {...props} />
   );
 }
 export function FieldsetLegend({

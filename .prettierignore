@@ -1,0 +1,6 @@
+apps/desktop/dist
+apps/desktop/out
+apps/web/dist
+coverage
+node_modules
+pnpm-lock.yaml

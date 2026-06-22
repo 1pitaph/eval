@@ -3,11 +3,7 @@
 
 import { mergeProps } from "@base-ui/react/merge-props";
 import { useRender } from "@base-ui/react/use-render";
-import {
-  ChevronLeftIcon,
-  ChevronRightIcon,
-  MoreHorizontalIcon,
-} from "lucide-react";
+import { ChevronLeftIcon, ChevronRightIcon, MoreHorizontalIcon } from "lucide-react";
 import type * as React from "react";
 import { cn } from "../lib/utils";
 import { type Button, buttonVariants } from "./button";
@@ -64,18 +60,18 @@ export function PaginationLink({
       : cn(
           buttonVariants({
             size,
-            variant: isActive ? "outline" : "ghost",
+            variant: isActive ? "outline" : "ghost"
           }),
-          className,
+          className
         ),
     "data-active": isActive,
-    "data-slot": "pagination-link",
+    "data-slot": "pagination-link"
   };
 
   return useRender({
     defaultTagName: "a",
     props: mergeProps<"a">(defaultProps, props),
-    render,
+    render
   });
 }
 

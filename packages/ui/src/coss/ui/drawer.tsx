@@ -16,10 +16,11 @@ import { ScrollArea } from "./scroll-area";
 
 type DrawerPosition = "right" | "left" | "top" | "bottom";
 
-const DrawerContext: React.Context<{ position: DrawerPosition }> =
-  createContext<{ position: DrawerPosition }>({
-    position: "bottom",
-  });
+const DrawerContext: React.Context<{ position: DrawerPosition }> = createContext<{
+  position: DrawerPosition;
+}>({
+  position: "bottom"
+});
 
 const directionMap: Record<
   DrawerPosition,
@@ -28,7 +29,7 @@ const directionMap: Record<
   bottom: "down",
   left: "left",
   right: "right",
-  top: "up",
+  top: "up"
 };
 
 export const DrawerCreateHandle: typeof DrawerPrimitive.createHandle =
@@ -51,18 +52,15 @@ export function Drawer({
   );
 }
 
-export const DrawerPortal: typeof DrawerPrimitive.Portal =
-  DrawerPrimitive.Portal;
+export const DrawerPortal: typeof DrawerPrimitive.Portal = DrawerPrimitive.Portal;
 
 export function DrawerTrigger(
-  props: DrawerPrimitive.Trigger.Props,
+  props: DrawerPrimitive.Trigger.Props
 ): React.ReactElement {
   return <DrawerPrimitive.Trigger data-slot="drawer-trigger" {...props} />;
 }
 
-export function DrawerClose(
-  props: DrawerPrimitive.Close.Props,
-): React.ReactElement {
+export function DrawerClose(props: DrawerPrimitive.Close.Props): React.ReactElement {
   return <DrawerPrimitive.Close data-slot="drawer-close" {...props} />;
 }
 
@@ -84,7 +82,7 @@ export function DrawerSwipeArea({
         position === "top" && "inset-x-0 top-0 h-8",
         position === "left" && "inset-y-0 left-0 w-8",
         position === "right" && "inset-y-0 right-0 w-8",
-        className,
+        className
       )}
       data-slot="drawer-swipe-area"
       {...props}
@@ -100,7 +98,7 @@ export function DrawerBackdrop({
     <DrawerPrimitive.Backdrop
       className={cn(
         "fixed inset-0 z-50 bg-black/32 opacity-[calc(1-var(--drawer-swipe-progress))] backdrop-blur-sm transition-opacity duration-450 ease-[cubic-bezier(0.32,0.72,0,1)] data-ending-style:opacity-0 data-starting-style:opacity-0 data-ending-style:duration-[calc(var(--drawer-swipe-strength)*400ms)] data-swiping:duration-0 supports-[-webkit-touch-callout:none]:absolute",
-        className,
+        className
       )}
       data-slot="drawer-backdrop"
       {...props}
@@ -129,7 +127,7 @@ export function DrawerViewport({
         variant === "inset" && "px-(--inset) sm:[--inset:--spacing(4)]",
         variant === "inset" && position !== "bottom" && "pt-(--inset)",
         variant === "inset" && position !== "top" && "pb-(--inset)",
-        className,
+        className
       )}
       data-slot="drawer-viewport"
       {...props}
@@ -180,18 +178,15 @@ export function DrawerPopup({
                 position === "left" &&
                   "rounded-e-2xl **:data-[slot=drawer-footer]:rounded-ee-[calc(var(--radius-2xl)-1px)]",
                 position === "right" &&
-                  "rounded-s-2xl **:data-[slot=drawer-footer]:rounded-es-[calc(var(--radius-2xl)-1px)]",
+                  "rounded-s-2xl **:data-[slot=drawer-footer]:rounded-es-[calc(var(--radius-2xl)-1px)]"
               ),
             variant === "default" &&
               cn(
                 position === "bottom" &&
                   "before:rounded-t-[calc(var(--radius-2xl)-1px)]",
-                position === "top" &&
-                  "before:rounded-b-[calc(var(--radius-2xl)-1px)]",
-                position === "left" &&
-                  "before:rounded-e-[calc(var(--radius-2xl)-1px)]",
-                position === "right" &&
-                  "before:rounded-s-[calc(var(--radius-2xl)-1px)]",
+                position === "top" && "before:rounded-b-[calc(var(--radius-2xl)-1px)]",
+                position === "left" && "before:rounded-e-[calc(var(--radius-2xl)-1px)]",
+                position === "right" && "before:rounded-s-[calc(var(--radius-2xl)-1px)]"
               ),
             variant === "inset" &&
               "before:hidden sm:rounded-2xl sm:border sm:after:bg-transparent sm:before:rounded-[calc(var(--radius-2xl)-1px)] sm:**:data-[slot=drawer-footer]:rounded-b-[calc(var(--radius-2xl)-1px)]",
@@ -206,7 +201,7 @@ export function DrawerPopup({
               "data-nested-drawer-open:transform-[translateX(calc(var(--drawer-swipe-movement-x)+var(--stack-peek-offset)))_scale(var(--scale))] origin-right",
             position === "right" &&
               "data-nested-drawer-open:transform-[translateX(calc(var(--drawer-swipe-movement-x)-var(--stack-peek-offset)))_scale(var(--scale))] origin-left",
-            className,
+            className
           )}
           data-slot="drawer-popup"
           {...props}
@@ -240,15 +235,15 @@ export function DrawerHeader({
     className: cn(
       "flex flex-col gap-2 p-6 in-[[data-slot=drawer-popup]:has([data-slot=drawer-panel])]:pb-3 max-sm:pb-4",
       !allowSelection && "cursor-default",
-      className,
+      className
     ),
-    "data-slot": "drawer-header",
+    "data-slot": "drawer-header"
   };
 
   return useRender({
     defaultTagName: "div",
     props: mergeProps<"div">(defaultProps, props),
-    render: allowSelection ? <DrawerContent render={render} /> : render,
+    render: allowSelection ? <DrawerContent render={render} /> : render
   });
 }
 
@@ -270,15 +265,15 @@ export function DrawerFooter({
         "border-t bg-muted/72 pt-4 pb-[calc(env(safe-area-inset-bottom,0px)+--spacing(4))]",
       variant === "bare" &&
         "in-[[data-slot=drawer-popup]:has([data-slot=drawer-panel])]:pt-3 pt-4 pb-[calc(env(safe-area-inset-bottom,0px)+--spacing(6))]",
-      className,
+      className
     ),
-    "data-slot": "drawer-footer",
+    "data-slot": "drawer-footer"
   };
 
   return useRender({
     defaultTagName: "div",
     props: mergeProps<"div">(defaultProps, props),
-    render: allowSelection ? <DrawerContent render={render} /> : render,
+    render: allowSelection ? <DrawerContent render={render} /> : render
   });
 }
 
@@ -288,10 +283,7 @@ export function DrawerTitle({
 }: DrawerPrimitive.Title.Props): React.ReactElement {
   return (
     <DrawerPrimitive.Title
-      className={cn(
-        "font-heading font-semibold text-xl leading-none",
-        className,
-      )}
+      className={cn("font-heading font-semibold text-xl leading-none", className)}
       data-slot="drawer-title"
       {...props}
     />
@@ -327,15 +319,15 @@ export function DrawerPanel({
     className: cn(
       "p-6 in-[[data-slot=drawer-popup]:has([data-slot=drawer-header])]:pt-1 in-[[data-slot=drawer-popup]:has([data-slot=drawer-footer]:not(.border-t))]:pb-1",
       !allowSelection && "cursor-default",
-      className,
+      className
     ),
-    "data-slot": "drawer-panel",
+    "data-slot": "drawer-panel"
   };
 
   const content = useRender({
     defaultTagName: "div",
     props: mergeProps<"div">(defaultProps, props),
-    render: allowSelection ? <DrawerContent render={render} /> : render,
+    render: allowSelection ? <DrawerContent render={render} /> : render
   });
 
   if (scrollable) {
@@ -371,20 +363,19 @@ export function DrawerBar({
       position === "bottom" && "top-0",
       position === "left" && "right-0",
       position === "right" && "left-0",
-      className,
+      className
     ),
-    "data-slot": "drawer-bar",
+    "data-slot": "drawer-bar"
   };
 
   return useRender({
     defaultTagName: "div",
     props: mergeProps<"div">(defaultProps, props),
-    render,
+    render
   });
 }
 
-export const DrawerContent: typeof DrawerPrimitive.Content =
-  DrawerPrimitive.Content;
+export const DrawerContent: typeof DrawerPrimitive.Content = DrawerPrimitive.Content;
 
 export function DrawerMenu({
   className,
@@ -393,13 +384,13 @@ export function DrawerMenu({
 }: useRender.ComponentProps<"nav">): React.ReactElement {
   const defaultProps = {
     className: cn("-m-2 flex flex-col", className),
-    "data-slot": "drawer-menu",
+    "data-slot": "drawer-menu"
   };
 
   return useRender({
     defaultTagName: "nav",
     props: mergeProps<"nav">(defaultProps, props),
-    render,
+    render
   });
 }
 
@@ -415,18 +406,18 @@ export function DrawerMenuItem({
   const defaultProps = {
     className: cn(
       "flex min-h-9 w-full cursor-default select-none items-center gap-2 rounded-sm px-2 py-1 text-base text-foreground outline-none hover:bg-accent hover:text-accent-foreground disabled:pointer-events-none disabled:opacity-64 data-[variant=destructive]:text-destructive-foreground sm:min-h-8 sm:text-sm [&>svg:not([class*='opacity-'])]:opacity-80 [&>svg:not([class*='size-'])]:size-4.5 sm:[&>svg:not([class*='size-'])]:size-4 [&>svg]:pointer-events-none [&>svg]:-mx-0.5 [&>svg]:shrink-0",
-      className,
+      className
     ),
     "data-slot": "drawer-menu-item",
     "data-variant": variant,
     disabled,
-    type: "button" as const,
+    type: "button" as const
   };
 
   return useRender({
     defaultTagName: "button",
     props: mergeProps<"button">(defaultProps, props),
-    render,
+    render
   });
 }
 
@@ -437,13 +428,13 @@ export function DrawerMenuSeparator({
 }: useRender.ComponentProps<"div">): React.ReactElement {
   const defaultProps = {
     className: cn("mx-2 my-1 h-px bg-border", className),
-    "data-slot": "drawer-menu-separator",
+    "data-slot": "drawer-menu-separator"
   };
 
   return useRender({
     defaultTagName: "div",
     props: mergeProps<"div">(defaultProps, props),
-    render,
+    render
   });
 }
 
@@ -454,13 +445,13 @@ export function DrawerMenuGroup({
 }: useRender.ComponentProps<"div">): React.ReactElement {
   const defaultProps = {
     className: cn("flex flex-col", className),
-    "data-slot": "drawer-menu-group",
+    "data-slot": "drawer-menu-group"
   };
 
   return useRender({
     defaultTagName: "div",
     props: mergeProps<"div">(defaultProps, props),
-    render,
+    render
   });
 }
 
@@ -470,17 +461,14 @@ export function DrawerMenuGroupLabel({
   ...props
 }: useRender.ComponentProps<"div">): React.ReactElement {
   const defaultProps = {
-    className: cn(
-      "px-2 py-1.5 font-medium text-muted-foreground text-xs",
-      className,
-    ),
-    "data-slot": "drawer-menu-group-label",
+    className: cn("px-2 py-1.5 font-medium text-muted-foreground text-xs", className),
+    "data-slot": "drawer-menu-group-label"
   };
 
   return useRender({
     defaultTagName: "div",
     props: mergeProps<"div">(defaultProps, props),
-    render,
+    render
   });
 }
 
@@ -493,7 +481,7 @@ export function DrawerMenuTrigger({
     <DrawerTrigger
       className={cn(
         "flex min-h-9 w-full cursor-default select-none items-center gap-2 rounded-sm px-2 py-1 text-base text-foreground outline-none hover:bg-accent hover:text-accent-foreground sm:min-h-8 sm:text-sm [&_svg:not(:last-child)]:-mx-0.5 [&_svg:not([class*='size-'])]:size-4.5 sm:[&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:shrink-0",
-        className,
+        className
       )}
       data-slot="drawer-menu-trigger"
       {...props}
@@ -526,7 +514,7 @@ export function DrawerMenuCheckboxItem({
         variant === "switch"
           ? "grid-cols-[1fr_auto] gap-4 pe-1.5"
           : "grid-cols-[1rem_1fr] pe-4",
-        className,
+        className
       )}
       data-slot="drawer-menu-checkbox-item"
       defaultChecked={defaultChecked}
@@ -598,7 +586,7 @@ export function DrawerMenuRadioItem({
       className={cn(
         "grid min-h-9 w-full cursor-default select-none items-center gap-2 rounded-sm px-2 py-1 text-base text-foreground outline-none hover:bg-accent hover:text-accent-foreground data-disabled:pointer-events-none data-disabled:opacity-64 sm:min-h-8 sm:text-sm [&_svg:not([class*='opacity-'])]:opacity-80 [&_svg:not([class*='size-'])]:size-4.5 sm:[&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:-mx-0.5 [&_svg]:shrink-0",
         "grid-cols-[1rem_1fr] items-center pe-4",
-        className,
+        className
       )}
       data-slot="drawer-menu-radio-item"
       disabled={disabled}

@@ -17,6 +17,7 @@ services:
       - api
     environment:
       VITE_API_BASE_URL: /api
+      VITE_API_PROXY_TARGET: http://api:8456
       WEB_PORT: 8455
     ports:
       - "8455:8455"

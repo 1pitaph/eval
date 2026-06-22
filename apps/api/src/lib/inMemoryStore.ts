@@ -1,16 +1,20 @@
 import { nanoid } from "nanoid";
-import type {
-  ApiProvider,
-  ApiProviderInput,
-  ApiProviderPatch,
-  EvalRunRecord,
-  EvalRunSpec,
-  PairwiseVote,
-  ReviewCampaign,
-  ReviewerSession,
-  ReviewLink,
-  ReviewTask,
-  WorkflowDraft
+import {
+  apiProviderCapabilitiesForModelType,
+  inferApiProviderModelType,
+  inferApiProviderModelVendor,
+  type ApiProvider,
+  type ApiProviderInput,
+  type ApiProviderPatch,
+  type EvalTaskRecord,
+  type EvalRunRecord,
+  type EvalRunSpec,
+  type PairwiseVote,
+  type ReviewCampaign,
+  type ReviewerSession,
+  type ReviewLink,
+  type ReviewTask,
+  type WorkflowDraft
 } from "@eval/workflow-schema";
 import { runImageEvalSpec } from "../services/imageEvalRunner";
 
@@ -20,6 +24,7 @@ type StoredApiProvider = ApiProvider & {
 
 const workflows = new Map<string, WorkflowDraft & { id: string }>();
 const runs = new Map<string, EvalRunRecord>();
+const evalTasks = new Map<string, EvalTaskRecord>();
 const reviewCampaigns = new Map<string, ReviewCampaign>();
 const reviewTasks = new Map<string, ReviewTask>();
 const reviewLinks = new Map<string, ReviewLink>();
@@ -28,6 +33,64 @@ const pairwiseVotes = new Map<string, PairwiseVote>();
 const apiProviders = new Map<string, StoredApiProvider>();
 
 seedDefaultApiProviders();
+
+export function resetInMemoryStoreForTests() {
+  workflows.clear();
+  runs.clear();
+  evalTasks.clear();
+  reviewCampaigns.clear();
+  reviewTasks.clear();
+  reviewLinks.clear();
+  reviewerSessions.clear();
+  pairwiseVotes.clear();
+  apiProviders.clear();
+  seedDefaultApiProviders();
+}
+
+export function createInMemoryStore() {
+  return {
+    createApiProvider,
+    deleteApiProvider,
+    createRun,
+    getApiProviderSecret,
+    getEvalTask,
+    getApiProvider,
+    getReviewCampaign,
+    getReviewLink,
+    getReviewLinkByToken,
+    getReviewerSession,
+    getReviewTask,
+    getRun,
+    getWorkflow,
+    listApiProviders,
+    listPairwiseVotes,
+    listPairwiseVotesForRun,
+    listPairwiseVotesForSession,
+    listReviewCampaigns,
+    listReviewLinks,
+    listReviewTasks,
+    listEvalTasks,
+    listEvalTasksForRun,
+    listWorkflows,
+    saveEvalTasks,
+    saveImportedRun,
+    saveReviewCampaign,
+    saveReviewLink,
+    saveReviewerSession,
+    saveReviewTasks,
+    saveRun,
+    saveWorkflow,
+    testApiProviderConnection,
+    updateEvalTask,
+    updateApiProvider,
+    updateReviewCampaign,
+    updateReviewLink,
+    updateReviewerSession,
+    updateReviewTask,
+    updateRun,
+    upsertPairwiseVote
+  };
+}
 
 export function saveWorkflow(draft: WorkflowDraft): WorkflowDraft & { id: string } {
   const id = draft.id ?? nanoid();
@@ -57,18 +120,54 @@ export function saveRun(spec: EvalRunSpec): EvalRunRecord {
   return record;
 }
 
+export function createRun(run: EvalRunRecord): EvalRunRecord {
+  runs.set(run.id, run);
+  for (const task of run.tasks) {
+    evalTasks.set(task.id, task);
+  }
+  return withTasks(run);
+}
+
 export function saveImportedRun(run: EvalRunRecord) {
   runs.set(run.id, run);
+  for (const task of run.tasks) {
+    evalTasks.set(task.id, task);
+  }
   return run;
 }
 
 export function getRun(id: string) {
-  return runs.get(id);
+  const run = runs.get(id);
+  return run ? withTasks(run) : undefined;
 }
 
 export function updateRun(run: EvalRunRecord) {
   runs.set(run.id, run);
-  return run;
+  return withTasks(run);
+}
+
+export function saveEvalTasks(tasks: EvalTaskRecord[]) {
+  for (const task of tasks) {
+    evalTasks.set(task.id, task);
+  }
+  return tasks;
+}
+
+export function getEvalTask(id: string) {
+  return evalTasks.get(id);
+}
+
+export function listEvalTasks() {
+  return Array.from(evalTasks.values());
+}
+
+export function listEvalTasksForRun(runId: string) {
+  return Array.from(evalTasks.values()).filter((task) => task.runId === runId);
+}
+
+export function updateEvalTask(task: EvalTaskRecord) {
+  evalTasks.set(task.id, task);
+  return task;
 }
 
 export function saveReviewCampaign(campaign: ReviewCampaign) {
@@ -188,6 +287,18 @@ export function getApiProvider(id: string): ApiProvider | undefined {
   return provider ? redactApiProvider(provider) : undefined;
 }
 
+export function getApiProviderSecret(id: string) {
+  const provider = apiProviders.get(id);
+  if (!provider) {
+    return undefined;
+  }
+
+  return {
+    provider: redactApiProvider(provider),
+    apiKey: provider.apiKey
+  };
+}
+
 export function createApiProvider(input: ApiProviderInput): ApiProvider {
   const now = new Date().toISOString();
   const record: StoredApiProvider = {
@@ -305,6 +416,8 @@ function seedDefaultApiProviders() {
           id: "gpt-image",
           name: "GPT Image",
           enabled: true,
+          vendor: "OpenAI",
+          type: "image",
           capabilities: ["image-generation"],
           estimatedCostPerImageUsd: 0.045,
           estimatedLatencyMs: 4200
@@ -355,10 +468,17 @@ function redactApiProvider(provider: StoredApiProvider): ApiProvider {
     baseUrl: provider.baseUrl,
     enabled: provider.enabled,
     credential: provider.credential,
-    models: provider.models,
+    models: provider.models.map(normalizeProviderModel),
     createdAt: provider.createdAt,
     updatedAt: provider.updatedAt,
     ...(provider.docsUrl ? { docsUrl: provider.docsUrl } : {})
+  };
+}
+
+function withTasks(run: EvalRunRecord): EvalRunRecord {
+  return {
+    ...run,
+    tasks: listEvalTasksForRun(run.id)
   };
 }
 
@@ -376,11 +496,25 @@ function credentialFromApiKey(apiKey: string | undefined): ApiProvider["credenti
 function normalizeProviderModel(
   model: ApiProvider["models"][number]
 ): ApiProvider["models"][number] {
+  const type = inferApiProviderModelType(
+    model.id,
+    model.name,
+    (model as Partial<ApiProvider["models"][number]>).type
+  );
   return {
     id: model.id.trim(),
     name: model.name.trim(),
     enabled: model.enabled,
-    capabilities: model.capabilities,
+    vendor: inferApiProviderModelVendor(
+      model.id,
+      model.name,
+      (model as Partial<ApiProvider["models"][number]>).vendor
+    ),
+    type,
+    capabilities:
+      model.capabilities?.length > 0
+        ? model.capabilities
+        : apiProviderCapabilitiesForModelType(type),
     estimatedCostPerImageUsd: model.estimatedCostPerImageUsd,
     estimatedLatencyMs: Math.round(model.estimatedLatencyMs)
   };

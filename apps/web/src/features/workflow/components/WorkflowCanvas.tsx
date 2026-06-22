@@ -6,6 +6,7 @@ import {
   MiniMap,
   Position,
   ReactFlow,
+  ReactFlowProvider,
   useReactFlow,
   type IsValidConnection,
   type NodeProps
@@ -66,6 +67,14 @@ export function WorkflowCanvas({
 }: {
   variant?: WorkflowCanvasVariant;
 }) {
+  return (
+    <ReactFlowProvider>
+      <WorkflowCanvasInner variant={variant} />
+    </ReactFlowProvider>
+  );
+}
+
+function WorkflowCanvasInner({ variant }: { variant: WorkflowCanvasVariant }) {
   const canvasTool = useWorkflowStore((state) => state.canvasTool);
   const nodes = useWorkflowStore((state) => state.nodes);
   const edges = useWorkflowStore((state) => state.edges);

@@ -32,8 +32,9 @@ import {
   updateReviewTask,
   updateRun,
   upsertPairwiseVote
-} from "../lib/inMemoryStore";
+} from "../lib/store";
 import { aggregateCampaignReviews } from "../services/reviewAggregation";
+import { resumeRunAfterHumanReview } from "../services/localRunOrchestrator";
 import { createReviewCampaignFromRun } from "../services/reviewTaskPlanner";
 
 const createCampaignBodySchema = z.object({
@@ -373,9 +374,10 @@ function aggregateRunCampaign(runId: string, campaignId: string, reply: FastifyR
     updateReviewTask(task);
   }
   updateRun(result.run);
+  const resumedRun = resumeRunAfterHumanReview(runId, campaign.id) ?? result.run;
 
   return {
-    run: result.run,
+    run: resumedRun,
     campaign: campaignWithLinks(result.campaign),
     aggregation: result.aggregation
   };

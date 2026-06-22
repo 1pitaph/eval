@@ -7,7 +7,7 @@ import {
   CircleCheckIcon,
   InfoIcon,
   LoaderCircleIcon,
-  TriangleAlertIcon,
+  TriangleAlertIcon
 } from "lucide-react";
 import type React from "react";
 import { cn } from "../lib/utils";
@@ -18,7 +18,7 @@ const TOAST_ICONS = {
   info: InfoIcon,
   loading: LoaderCircleIcon,
   success: CircleCheckIcon,
-  warning: TriangleAlertIcon,
+  warning: TriangleAlertIcon
 } as const;
 
 type SwipeDirection = "up" | "down" | "left" | "right";
@@ -32,9 +32,7 @@ type ToastData = {
 };
 
 function getSwipeDirection(position: ToastPosition): SwipeDirection[] {
-  const verticalDirection: SwipeDirection = position.startsWith("top")
-    ? "up"
-    : "down";
+  const verticalDirection: SwipeDirection = position.startsWith("top") ? "up" : "down";
 
   if (position.includes("center")) {
     return [verticalDirection];
@@ -62,7 +60,7 @@ function upsertReplayClassName(toast: {
 
 function Toasts({
   position,
-  portalProps,
+  portalProps
 }: {
   position: ToastPosition;
   portalProps?: React.ComponentProps<typeof Toast.Portal> | undefined;
@@ -81,7 +79,7 @@ function Toasts({
           // Horizontal positioning
           "data-[position*=left]:left-(--toast-inset)",
           "data-[position*=right]:right-(--toast-inset)",
-          "data-[position*=center]:left-1/2 data-[position*=center]:-translate-x-1/2",
+          "data-[position*=center]:left-1/2 data-[position*=center]:-translate-x-1/2"
         )}
         data-position={position}
         data-slot="toast-viewport"
@@ -135,7 +133,7 @@ function Toasts({
                 "data-expanded:data-ending-style:data-[swipe-direction=right]:transform-[translateX(calc(var(--toast-swipe-movement-x)+100%+var(--toast-inset)))_translateY(var(--toast-calc-offset-y))]",
                 "data-expanded:data-ending-style:data-[swipe-direction=up]:transform-[translateY(calc(var(--toast-swipe-movement-y)-100%-var(--toast-inset)))]",
                 "data-expanded:data-ending-style:data-[swipe-direction=down]:transform-[translateY(calc(var(--toast-swipe-movement-y)+100%+var(--toast-inset)))]",
-                upsertReplayClassName(toast),
+                upsertReplayClassName(toast)
               )}
               {...toastData?.rootProps}
               data-position={position}
@@ -154,10 +152,7 @@ function Toasts({
                   )}
 
                   <div className="flex flex-col gap-0.5">
-                    <Toast.Title
-                      className="font-medium"
-                      data-slot="toast-title"
-                    />
+                    <Toast.Title className="font-medium" data-slot="toast-title" />
                     <Toast.Description
                       className="text-muted-foreground"
                       data-slot="toast-description"
@@ -182,7 +177,7 @@ function Toasts({
 }
 
 function AnchoredToasts({
-  portalProps,
+  portalProps
 }: {
   portalProps?: React.ComponentProps<typeof Toast.Portal> | undefined;
 }): React.ReactElement {
@@ -190,10 +185,7 @@ function AnchoredToasts({
 
   return (
     <Toast.Portal data-slot="toast-portal-anchored" {...portalProps}>
-      <Toast.Viewport
-        className="outline-none"
-        data-slot="toast-viewport-anchored"
-      >
+      <Toast.Viewport className="outline-none" data-slot="toast-viewport-anchored">
         {toasts.map((toast) => {
           const Icon = toast.type
             ? TOAST_ICONS[toast.type as keyof typeof TOAST_ICONS]
@@ -220,7 +212,7 @@ function AnchoredToasts({
                   tooltipStyle
                     ? "rounded-md shadow-md/5 before:rounded-[calc(var(--radius-md)-1px)]"
                     : "rounded-lg shadow-lg/5 before:rounded-[calc(var(--radius-lg)-1px)]",
-                  upsertReplayClassName(toast),
+                  upsertReplayClassName(toast)
                 )}
                 {...toastData?.rootProps}
                 data-slot="toast-popup"
@@ -243,10 +235,7 @@ function AnchoredToasts({
                       )}
 
                       <div className="flex flex-col gap-0.5">
-                        <Toast.Title
-                          className="font-medium"
-                          data-slot="toast-title"
-                        />
+                        <Toast.Title className="font-medium" data-slot="toast-title" />
                         <Toast.Description
                           className="text-muted-foreground"
                           data-slot="toast-description"

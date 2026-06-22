@@ -1,6 +1,11 @@
 export { Badge } from "./components/Badge";
 export { Button, ButtonLink } from "./components/Button";
-export { CheckboxControl, SelectControl, TextArea, TextInput } from "./components/FormControls";
+export {
+  CheckboxControl,
+  SelectControl,
+  TextArea,
+  TextInput
+} from "./components/FormControls";
 export type { SelectOption } from "./components/FormControls";
 export { Panel } from "./components/Panel";
 export * from "./coss/ui/accordion";

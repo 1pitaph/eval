@@ -652,9 +652,7 @@ function variablesFromTemplate(template: string) {
     .filter((variable): variable is string => Boolean(variable));
 }
 
-function modelsFromProviders(
-  providers: ApiProvider[] | undefined
-): AvailableModel[] {
+function modelsFromProviders(providers: ApiProvider[] | undefined): AvailableModel[] {
   const seen = new Set<string>();
   const models: AvailableModel[] = [];
 

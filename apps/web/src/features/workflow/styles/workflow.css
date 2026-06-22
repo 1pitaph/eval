@@ -86,7 +86,11 @@
   --secondary: --alpha(var(--color-black) / 4%);
   --secondary-foreground: var(--color-neutral-800);
   --muted: --alpha(var(--color-black) / 4%);
-  --muted-foreground: color-mix(in srgb, var(--color-neutral-500) 90%, var(--color-black));
+  --muted-foreground: color-mix(
+    in srgb,
+    var(--color-neutral-500) 90%,
+    var(--color-black)
+  );
   --accent: --alpha(var(--color-black) / 4%);
   --accent-foreground: var(--color-neutral-800);
   --destructive: var(--color-red-500);
@@ -109,7 +113,11 @@
   --code-foreground: var(--foreground);
   --code-highlight: --alpha(var(--color-black) / 4%);
   --sidebar: var(--color-neutral-50);
-  --sidebar-foreground: color-mix(in srgb, var(--color-neutral-800) 64%, var(--sidebar));
+  --sidebar-foreground: color-mix(
+    in srgb,
+    var(--color-neutral-800) 64%,
+    var(--sidebar)
+  );
   --sidebar-primary: var(--color-neutral-800);
   --sidebar-primary-foreground: var(--color-neutral-50);
   --sidebar-accent: --alpha(var(--color-black) / 4%);
@@ -117,7 +125,6 @@
   --sidebar-border: --alpha(var(--color-black) / 6%);
   --sidebar-ring: var(--color-neutral-400);
 }
-
 
 * {
   box-sizing: border-box;
@@ -127,9 +134,7 @@
 
 *:hover,
 *:focus-within {
-  scrollbar-color:
-    color-mix(in srgb, var(--foreground) 28%, transparent)
-    transparent;
+  scrollbar-color: color-mix(in srgb, var(--foreground) 28%, transparent) transparent;
 }
 
 *::-webkit-scrollbar {
@@ -1041,6 +1046,13 @@ a {
   font-size: 13px;
 }
 
+.run-panel__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
 .run-panel__issues {
   display: grid;
   gap: 8px;
@@ -1057,6 +1069,42 @@ a {
   font-size: 12px;
   gap: 2px;
   padding: 8px;
+}
+
+.run-timeline {
+  display: grid;
+  gap: 8px;
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+}
+
+.run-timeline__item {
+  background: #ffffff;
+  border: 1px solid #e4e4e7;
+  border-radius: 7px;
+  display: grid;
+  gap: 6px;
+  padding: 8px;
+}
+
+.run-timeline__item > div {
+  align-items: start;
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+}
+
+.run-timeline__item strong {
+  font-size: 12px;
+}
+
+.run-timeline__item span,
+.run-timeline__item p {
+  color: #64748b;
+  font-size: 11px;
+  line-height: 1.35;
+  margin: 0;
 }
 
 .manifest-breakdown {
@@ -1115,6 +1163,17 @@ a {
 }
 
 .manifest-issues li {
+  align-items: start;
+  background: #ffffff;
+  border: 1px solid #e4e4e7;
+  border-radius: 7px;
+  display: grid;
+  gap: 6px;
+  grid-template-columns: auto minmax(0, 1fr);
+  padding: 8px;
+}
+
+.manifest-issues > div {
   align-items: start;
   background: #ffffff;
   border: 1px solid #e4e4e7;
@@ -2720,10 +2779,8 @@ a {
   --sidebar-foreground: #52525b;
   --sidebar-accent: rgba(24, 24, 27, 0.06);
   --shadow-xs: 0 1px 2px rgba(24, 24, 27, 0.05);
-  --shadow-sm:
-    0 1px 2px rgba(24, 24, 27, 0.04), 0 0 0 1px rgba(24, 24, 27, 0.02);
-  --shadow-md:
-    0 14px 36px rgba(24, 24, 27, 0.08), 0 1px 2px rgba(24, 24, 27, 0.06);
+  --shadow-sm: 0 1px 2px rgba(24, 24, 27, 0.04), 0 0 0 1px rgba(24, 24, 27, 0.02);
+  --shadow-md: 0 14px 36px rgba(24, 24, 27, 0.08), 0 1px 2px rgba(24, 24, 27, 0.06);
   --control-height: 32px;
   --control-height-sm: 28px;
   color: var(--foreground);
@@ -3635,8 +3692,7 @@ textarea:focus-visible {
 .pareto-chart {
   background:
     linear-gradient(var(--border) 1px, transparent 1px),
-    linear-gradient(90deg, var(--border) 1px, transparent 1px),
-    var(--card);
+    linear-gradient(90deg, var(--border) 1px, transparent 1px), var(--card);
   background-size: 44px 44px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -4062,6 +4118,14 @@ textarea:focus-visible {
   font-size: 13px;
 }
 
+.provider-section__actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
 .provider-form-grid {
   display: grid;
   gap: 10px;
@@ -4087,7 +4151,8 @@ textarea:focus-visible {
 
 .provider-field .ui-input,
 .provider-field .ui-select,
-.provider-model-add .ui-input {
+.provider-model-add .ui-input,
+.provider-model-add .ui-select {
   background: var(--card);
   border: 1px solid var(--input);
   border-radius: calc(var(--radius) - 3px);
@@ -4100,9 +4165,45 @@ textarea:focus-visible {
   padding: 7px 9px;
 }
 
+.provider-model-controls {
+  align-items: end;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(160px, 0.8fr) minmax(160px, 1fr) minmax(140px, 0.8fr);
+}
+
 .provider-model-list {
   display: grid;
   gap: 8px;
+}
+
+.provider-model-empty {
+  background: var(--card);
+  border: 1px dashed var(--border);
+  border-radius: calc(var(--radius) - 2px);
+  color: var(--muted-foreground);
+  font-size: 12px;
+  padding: 10px;
+}
+
+.provider-model-group {
+  display: grid;
+  gap: 8px;
+}
+
+.provider-model-group__header {
+  align-items: center;
+  color: var(--muted-foreground);
+  display: flex;
+  font-size: 12px;
+  gap: 8px;
+  justify-content: space-between;
+  padding: 2px 2px 0;
+}
+
+.provider-model-group__header strong {
+  color: var(--foreground);
+  font-size: 12px;
 }
 
 .provider-model-row {
@@ -4112,7 +4213,10 @@ textarea:focus-visible {
   border-radius: calc(var(--radius) - 2px);
   display: grid;
   gap: 8px;
-  grid-template-columns: auto minmax(116px, 0.85fr) minmax(136px, 1fr) minmax(82px, 0.35fr) minmax(92px, 0.42fr) auto;
+  grid-template-columns:
+    auto minmax(116px, 0.85fr) minmax(136px, 1fr) minmax(104px, 0.55fr)
+    minmax(112px, 0.55fr) minmax(82px, 0.35fr) minmax(92px, 0.42fr)
+    auto;
   min-width: 0;
   padding: 9px;
 }
@@ -4124,7 +4228,9 @@ textarea:focus-visible {
 .provider-model-add {
   display: grid;
   gap: 8px;
-  grid-template-columns: minmax(110px, 0.9fr) minmax(120px, 1fr) 92px 104px auto;
+  grid-template-columns:
+    minmax(110px, 0.9fr) minmax(120px, 1fr) minmax(100px, 0.7fr)
+    minmax(110px, 0.7fr) 92px 104px auto;
   min-width: 0;
 }
 
@@ -4203,6 +4309,7 @@ textarea:focus-visible {
     max-height: 280px;
   }
 
+  .provider-model-controls,
   .provider-model-row,
   .provider-model-add {
     grid-template-columns: minmax(0, 1fr);
@@ -5006,7 +5113,9 @@ textarea:focus-visible {
   align-items: center;
   display: grid;
   gap: 8px;
-  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto minmax(0, 1fr) auto minmax(0, 1.1fr);
+  grid-template-columns:
+    minmax(0, 1fr) auto minmax(0, 1fr) auto minmax(0, 1fr)
+    auto minmax(0, 1.1fr);
 }
 
 .matrix-formula > span {

@@ -5,7 +5,13 @@ import tseslint from "typescript-eslint";
 
 export default [
   {
-    ignores: ["**/dist/**", "**/node_modules/**", "coverage/**", "pnpm-lock.yaml"]
+    ignores: [
+      "**/dist/**",
+      "**/node_modules/**",
+      "apps/desktop/out/**",
+      "coverage/**",
+      "pnpm-lock.yaml"
+    ]
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,
@@ -18,6 +24,21 @@ export default [
     rules: {
       ...reactHooks.configs.recommended.rules,
       "react-refresh/only-export-components": ["warn", { allowConstantExport: true }]
+    }
+  },
+  {
+    files: ["packages/ui/src/coss/ui/**/*.{ts,tsx}"],
+    rules: {
+      "react-refresh/only-export-components": "off"
+    }
+  },
+  {
+    files: ["apps/desktop/scripts/**/*.mjs"],
+    languageOptions: {
+      globals: {
+        console: "readonly",
+        process: "readonly"
+      }
     }
   },
   {

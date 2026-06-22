@@ -5,7 +5,7 @@ import {
   listApiProviders,
   listWorkflows,
   saveWorkflow
-} from "../lib/inMemoryStore";
+} from "../lib/store";
 import { compileWorkflow } from "../services/workflowCompiler";
 
 export async function registerWorkflowRoutes(app: FastifyInstance) {

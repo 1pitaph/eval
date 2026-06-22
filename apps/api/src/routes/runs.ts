@@ -1,6 +1,13 @@
 import type { FastifyInstance } from "fastify";
-import { getRun, listApiProviders, saveRun } from "../lib/inMemoryStore";
+import { getRun, listApiProviders } from "../lib/store";
+import { getArtifactStore } from "../services/artifactStore";
 import { compileWorkflow } from "../services/workflowCompiler";
+import {
+  cancelRun,
+  createRunExecution,
+  retryRun
+} from "../services/localRunOrchestrator";
+import { subscribeRunEvents } from "../services/runEvents";
 
 export async function registerRunRoutes(app: FastifyInstance) {
   app.post("/runs", async (request, reply) => {
@@ -9,9 +16,79 @@ export async function registerRunRoutes(app: FastifyInstance) {
       return reply.code(422).send(compiled);
     }
 
-    const run = saveRun(compiled.spec);
-    return reply.code(202).send({ run, warnings: compiled.warnings });
+    const run = createRunExecution(compiled.spec, compiled.warnings);
+    return reply.code(202).send({
+      runId: run.id,
+      status: run.status,
+      warnings: compiled.warnings,
+      manifest: run.spec.manifest
+    });
   });
+
+  app.post<{ Params: { id: string } }>("/runs/:id/retry", async (request, reply) => {
+    const run = retryRun(request.params.id);
+    if (!run) {
+      return reply.code(404).send({ message: "Run not found" });
+    }
+
+    return { run };
+  });
+
+  app.post<{ Params: { id: string } }>("/runs/:id/cancel", async (request, reply) => {
+    const run = cancelRun(request.params.id);
+    if (!run) {
+      return reply.code(404).send({ message: "Run not found" });
+    }
+
+    return { run };
+  });
+
+  app.get<{ Params: { id: string } }>("/runs/:id/events", async (request, reply) => {
+    const run = getRun(request.params.id);
+    if (!run) {
+      return reply.code(404).send({ message: "Run not found" });
+    }
+
+    reply.hijack();
+    reply.raw.writeHead(200, {
+      "cache-control": "no-cache, no-transform",
+      connection: "keep-alive",
+      "content-type": "text/event-stream; charset=utf-8"
+    });
+    reply.raw.write(`event: snapshot\ndata: ${JSON.stringify({ run })}\n\n`);
+
+    const heartbeat = setInterval(() => {
+      reply.raw.write(": heartbeat\n\n");
+    }, 15000);
+    const unsubscribe = subscribeRunEvents(request.params.id, ({ event }) => {
+      const nextRun = getRun(request.params.id);
+      reply.raw.write(
+        `event: run-event\ndata: ${JSON.stringify({ event, run: nextRun })}\n\n`
+      );
+    });
+
+    request.raw.on("close", () => {
+      clearInterval(heartbeat);
+      unsubscribe();
+    });
+  });
+
+  app.get<{ Params: { id: string; fileName: string } }>(
+    "/runs/:id/artifacts/:fileName",
+    async (request, reply) => {
+      const store = getArtifactStore();
+      if (!store) {
+        return reply.code(404).send({ message: "Artifact store is not configured" });
+      }
+
+      try {
+        const artifact = await store.read(request.params.id, request.params.fileName);
+        return reply.header("content-type", artifact.contentType).send(artifact.body);
+      } catch {
+        return reply.code(404).send({ message: "Artifact not found" });
+      }
+    }
+  );
 
   app.get<{ Params: { id: string } }>(
     "/runs/:id/export.json",
@@ -19,6 +96,9 @@ export async function registerRunRoutes(app: FastifyInstance) {
       const run = getRun(request.params.id);
       if (!run) {
         return reply.code(404).send({ message: "Run not found" });
+      }
+      if (!isExportable(run)) {
+        return reply.code(409).send({ message: "Run is not ready to export" });
       }
 
       return reply
@@ -38,6 +118,9 @@ export async function registerRunRoutes(app: FastifyInstance) {
       if (!run) {
         return reply.code(404).send({ message: "Run not found" });
       }
+      if (!isExportable(run)) {
+        return reply.code(409).send({ message: "Run is not ready to export" });
+      }
 
       return reply
         .header("content-type", "text/csv; charset=utf-8")
@@ -55,6 +138,9 @@ export async function registerRunRoutes(app: FastifyInstance) {
       const run = getRun(request.params.id);
       if (!run) {
         return reply.code(404).send({ message: "Run not found" });
+      }
+      if (!isExportable(run)) {
+        return reply.code(409).send({ message: "Run is not ready to export" });
       }
 
       return reply
@@ -84,6 +170,10 @@ export async function registerRunRoutes(app: FastifyInstance) {
 
     return run;
   });
+}
+
+function isExportable(run: NonNullable<ReturnType<typeof getRun>>) {
+  return run.status === "succeeded" || run.status === "waiting_human";
 }
 
 function toArtifactCsv(run: NonNullable<ReturnType<typeof getRun>>) {

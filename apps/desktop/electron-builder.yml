@@ -1,0 +1,26 @@
+appId: com.evalstudio.desktop
+productName: Eval Studio
+directories:
+  output: dist
+files:
+  - out/**
+  - package.json
+extraResources:
+  - from: ../web/dist
+    to: web
+mac:
+  category: public.app-category.developer-tools
+  hardenedRuntime: true
+  gatekeeperAssess: false
+  entitlements: build/entitlements.mac.plist
+  entitlementsInherit: build/entitlements.mac.plist
+  target:
+    - target: dmg
+      arch:
+        - arm64
+        - x64
+    - target: zip
+      arch:
+        - arm64
+        - x64
+afterSign: scripts/notarize.mjs

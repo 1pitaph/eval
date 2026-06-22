@@ -1,9 +1,4 @@
-import {
-  useMemo,
-  useState,
-  type ChangeEvent,
-  type ReactNode
-} from "react";
+import { useMemo, useState, type ChangeEvent, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   ArrowRight,
@@ -325,13 +320,19 @@ function NodeEditor({
     case "artifact.store":
       return <ArtifactStoreEditor config={config} onPatch={onPatch} run={run} />;
     case "metric.auto_image":
-      return <AutoMetricsEditor config={config} onPatch={onPatch} plan={plan} run={run} />;
+      return (
+        <AutoMetricsEditor config={config} onPatch={onPatch} plan={plan} run={run} />
+      );
     case "human.pairwise":
-      return <HumanEvalEditor config={config} onPatch={onPatch} plan={plan} run={run} />;
+      return (
+        <HumanEvalEditor config={config} onPatch={onPatch} plan={plan} run={run} />
+      );
     case "aggregate.model_scores":
       return <AggregateEditor config={config} onPatch={onPatch} run={run} />;
     case "decision.release_gate":
-      return <ReleaseGateEditor config={config} onPatch={onPatch} plan={plan} run={run} />;
+      return (
+        <ReleaseGateEditor config={config} onPatch={onPatch} plan={plan} run={run} />
+      );
     default:
       return <GenericConfigEditor config={config} node={node} onPatch={onPatch} />;
   }
@@ -357,7 +358,8 @@ function PromptSetEditor({
       onPatch({
         inputUiMode: "dataset",
         mode: "dataset",
-        datasetId: datasetId === "inline-run-input" ? "golden-image-prompts-v1" : datasetId,
+        datasetId:
+          datasetId === "inline-run-input" ? "golden-image-prompts-v1" : datasetId,
         sampleLimit: Math.max(sampleLimit, 1)
       });
       return;
@@ -440,7 +442,8 @@ function PromptSetEditor({
 
   const removePrompt = (index: number) => {
     const nextPrompts = promptCases.filter((_, promptIndex) => promptIndex !== index);
-    const fallback = nextPrompts.length > 0 ? nextPrompts : [toPromptCase(defaultPrompt, 1)];
+    const fallback =
+      nextPrompts.length > 0 ? nextPrompts : [toPromptCase(defaultPrompt, 1)];
     onPatch({
       inputUiMode: fallback.length > 1 ? "batch" : "single",
       mode: "inline",
@@ -586,7 +589,10 @@ function PromptSetEditor({
         title="Output Preview"
       >
         <div className="prompt-preview-list">
-          {(inputMode === "dataset" ? sampleDatasetPrompts : promptCases.map((p) => p.prompt))
+          {(inputMode === "dataset"
+            ? sampleDatasetPrompts
+            : promptCases.map((p) => p.prompt)
+          )
             .slice(0, 4)
             .map((prompt, index) => (
               <div className="prompt-preview-row" key={`${prompt}-${index}`}>
@@ -823,7 +829,9 @@ function ModelFanoutEditor({
         </div>
         <div className="inspector-inline-facts">
           <span>Estimated generation cost ${estimatedCost.toFixed(2)}</span>
-          <span>Slowest provider {maxLatency(visibleModels, selectedModels) / 1000}s</span>
+          <span>
+            Slowest provider {maxLatency(visibleModels, selectedModels) / 1000}s
+          </span>
         </div>
       </InspectorSection>
     </div>
@@ -1076,7 +1084,10 @@ function HumanEvalEditor({
         <div className="inspector-stat-grid inspector-stat-grid--nested">
           <InspectorStat label="Tasks" value={String(humanTasks)} />
           <InspectorStat label="Votes" value={String(votes)} />
-          <InspectorStat label="Pairs" value={String(Math.max(plan.models.length - 1, 0))} />
+          <InspectorStat
+            label="Pairs"
+            value={String(Math.max(plan.models.length - 1, 0))}
+          />
         </div>
       </InspectorSection>
 
@@ -1115,7 +1126,9 @@ function HumanEvalEditor({
         {run ? (
           <div className="inspector-inline-facts">
             <span>{run.pairwise.length} pairwise tasks seeded</span>
-            <span>{run.reviews.filter((review) => review.verdict === "pass").length} pass</span>
+            <span>
+              {run.reviews.filter((review) => review.verdict === "pass").length} pass
+            </span>
           </div>
         ) : (
           <EmptyEvidence text="Run this workflow to seed blind pairwise review evidence." />
@@ -1215,7 +1228,10 @@ function ReleaseGateEditor({
   plan: DerivedPlan;
   run: EvalRunRecord | undefined;
 }) {
-  const baselineRunId = stringConfig(config.baselineRunId, plan.releaseGate.baselineRunId);
+  const baselineRunId = stringConfig(
+    config.baselineRunId,
+    plan.releaseGate.baselineRunId
+  );
   const minHumanWinRate = numberConfig(
     config.minHumanWinRate,
     plan.releaseGate.minHumanWinRate
@@ -1225,34 +1241,32 @@ function ReleaseGateEditor({
     plan.releaseGate.maxCostIncreasePct
   );
   const safetyMustPass = config.safetyMustPass !== false;
-  const gates =
-    run?.decision.gates ??
-    [
-      {
-        label: "Average quality",
-        passed: true,
-        actual: "tracked",
-        target: ">= 74%"
-      },
-      {
-        label: "Human win rate",
-        passed: true,
-        actual: "planned",
-        target: `>= ${percent(minHumanWinRate)}`
-      },
-      {
-        label: "Safety pass rate",
-        passed: safetyMustPass,
-        actual: safetyMustPass ? "required" : "tracked",
-        target: safetyMustPass ? ">= 92%" : "tracked"
-      },
-      {
-        label: "P95 latency",
-        passed: true,
-        actual: "tracked",
-        target: "<= 6.5s"
-      }
-    ];
+  const gates = run?.decision.gates ?? [
+    {
+      label: "Average quality",
+      passed: true,
+      actual: "tracked",
+      target: ">= 74%"
+    },
+    {
+      label: "Human win rate",
+      passed: true,
+      actual: "planned",
+      target: `>= ${percent(minHumanWinRate)}`
+    },
+    {
+      label: "Safety pass rate",
+      passed: safetyMustPass,
+      actual: safetyMustPass ? "required" : "tracked",
+      target: safetyMustPass ? ">= 92%" : "tracked"
+    },
+    {
+      label: "P95 latency",
+      passed: true,
+      actual: "tracked",
+      target: "<= 6.5s"
+    }
+  ];
 
   return (
     <div className="inspector-node-editor">
@@ -1489,7 +1503,9 @@ function ConnectionStrip({
       />
       <ArrowRight aria-hidden="true" size={16} />
       <FlowEndpoint
-        detail={outgoing.map((edge) => edge.sourceHandle ?? "output").join(", ") || "Done"}
+        detail={
+          outgoing.map((edge) => edge.sourceHandle ?? "output").join(", ") || "Done"
+        }
         label="Next"
         value={targetLabels.join(", ") || "End"}
       />
@@ -1816,7 +1832,9 @@ function derivePlan(nodes: EvalFlowNode[]): DerivedPlan {
   const inputMode = inputModeFromConfig(datasetConfig, promptCases);
   const sampleLimit = numberConfig(datasetConfig.sampleLimit, 4);
   const promptCount =
-    inputMode === "dataset" ? Math.min(Math.max(sampleLimit, 1), 4) : promptCases.length;
+    inputMode === "dataset"
+      ? Math.min(Math.max(sampleLimit, 1), 4)
+      : promptCases.length;
   const referenceImages = referenceImagesFromConfig(datasetConfig.referenceImages);
   const referenceImageCount =
     referenceImages.length +
@@ -1915,13 +1933,15 @@ function nodeStats(
         {
           label: "Budget",
           value: `$${plan.generationBudgetUsd.toFixed(0)}`,
-          tone:
-            plan.estimatedCostUsd > plan.generationBudgetUsd ? "warning" : undefined
+          tone: plan.estimatedCostUsd > plan.generationBudgetUsd ? "warning" : undefined
         }
       ];
     case "artifact.store":
       return [
-        { label: "Artifacts", value: run ? String(run.artifacts.length) : String(plan.imageCount) },
+        {
+          label: "Artifacts",
+          value: run ? String(run.artifacts.length) : String(plan.imageCount)
+        },
         { label: "Lineage", value: "On" },
         { label: "Hashes", value: "On" }
       ];
@@ -1940,18 +1960,27 @@ function nodeStats(
     case "aggregate.model_scores":
       return [
         { label: "Method", value: rankingLabel(plan.rankingMethod) },
-        { label: "Models", value: run ? String(run.modelSummaries.length) : String(plan.models.length) },
+        {
+          label: "Models",
+          value: run ? String(run.modelSummaries.length) : String(plan.models.length)
+        },
         { label: "Inputs", value: "2" }
       ];
     case "decision.release_gate":
       return [
         { label: "Status", value: run?.decision.status ?? "Planned" },
         { label: "Win target", value: percent(plan.releaseGate.minHumanWinRate) },
-        { label: "Safety", value: plan.releaseGate.safetyMustPass ? "Required" : "Tracked" }
+        {
+          label: "Safety",
+          value: plan.releaseGate.safetyMustPass ? "Required" : "Tracked"
+        }
       ];
     default:
       return [
-        { label: "Runtime", value: getNodeDefinition(node.type ?? "")?.runtime ?? "none" },
+        {
+          label: "Runtime",
+          value: getNodeDefinition(node.type ?? "")?.runtime ?? "none"
+        },
         { label: "Status", value: String(node.data.status ?? "idle") },
         { label: "Config", value: String(Object.keys(node.data.config ?? {}).length) }
       ];
@@ -2049,21 +2078,19 @@ function promptCasesFromConfig(value: unknown): PromptCase[] {
     return [toPromptCase(defaultPrompt, 1)];
   }
 
-  const prompts = value
-    .filter(isRecord)
-    .map((prompt, index) =>
-      cleanPromptCase({
-        id: typeof prompt.id === "string" ? prompt.id : `prompt-${index + 1}`,
-        prompt: typeof prompt.prompt === "string" ? prompt.prompt : defaultPrompt,
-        tags: Array.isArray(prompt.tags)
-          ? prompt.tags.filter((tag): tag is string => typeof tag === "string")
-          : [],
-        referenceImages: referenceImagesFromConfig(prompt.referenceImages),
-        ...(typeof prompt.expectedText === "string"
-          ? { expectedText: prompt.expectedText }
-          : {})
-      })
-    );
+  const prompts = value.filter(isRecord).map((prompt, index) =>
+    cleanPromptCase({
+      id: typeof prompt.id === "string" ? prompt.id : `prompt-${index + 1}`,
+      prompt: typeof prompt.prompt === "string" ? prompt.prompt : defaultPrompt,
+      tags: Array.isArray(prompt.tags)
+        ? prompt.tags.filter((tag): tag is string => typeof tag === "string")
+        : [],
+      referenceImages: referenceImagesFromConfig(prompt.referenceImages),
+      ...(typeof prompt.expectedText === "string"
+        ? { expectedText: prompt.expectedText }
+        : {})
+    })
+  );
 
   return prompts.length > 0 ? prompts : [toPromptCase(defaultPrompt, 1)];
 }
@@ -2129,9 +2156,7 @@ function renderPrompt(template: string, prompt: string) {
   return template.replaceAll("{{prompt}}", prompt);
 }
 
-function modelsFromProviders(
-  providers: ApiProvider[] | undefined
-): AvailableModel[] {
+function modelsFromProviders(providers: ApiProvider[] | undefined): AvailableModel[] {
   const seen = new Set<string>();
   const models: AvailableModel[] = [];
 
@@ -2344,7 +2369,9 @@ function roleLabel(role: AssetRole) {
   }
 }
 
-function statusTone(status: string): "neutral" | "success" | "warning" | "danger" | "info" {
+function statusTone(
+  status: string
+): "neutral" | "success" | "warning" | "danger" | "info" {
   switch (status) {
     case "succeeded":
     case "cached":

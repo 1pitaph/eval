@@ -3,6 +3,13 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "exports": {
+    ".": "./src/app.ts",
+    "./app": "./src/app.ts",
+    "./artifact-store": "./src/services/artifactStore.ts",
+    "./sqlite-store": "./src/lib/sqliteStore.ts",
+    "./store": "./src/lib/store.ts"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.json --noEmit",
     "dev": "tsx watch src/server.ts",

@@ -4,6 +4,7 @@ import {
   ExternalLink,
   KeyRound,
   Plus,
+  RefreshCw,
   Search,
   ServerCog,
   Trash2
@@ -16,8 +17,14 @@ import type {
   ApiProviderImageProvider,
   ApiProviderInput,
   ApiProviderModel,
+  ApiProviderModelType,
   ApiProviderPatch,
   ApiProviderProtocol
+} from "@eval/workflow-schema";
+import {
+  apiProviderCapabilitiesForModelType,
+  inferApiProviderModelType,
+  inferApiProviderModelVendor
 } from "@eval/workflow-schema";
 import {
   Badge,
@@ -30,6 +37,7 @@ import {
 import {
   createApiProvider,
   deleteApiProvider,
+  fetchApiProviderModels,
   listApiProviders,
   testApiProviderConnection,
   updateApiProvider
@@ -49,6 +57,8 @@ type ProviderFormState = {
 type NewModelState = {
   id: string;
   name: string;
+  vendor: string;
+  type: ApiProviderModelType;
   estimatedCostPerImageUsd: number;
   estimatedLatencyMs: number;
 };
@@ -58,6 +68,8 @@ type ProviderFormDraft = {
   form: ProviderFormState;
   apiKeyTouched: boolean;
 };
+
+type ModelGroupBy = "none" | "vendor" | "type" | "status";
 
 const providerProtocolOptions: Array<{
   label: string;
@@ -82,9 +94,31 @@ const imageProviderOptions: Array<{
 const emptyModel: NewModelState = {
   id: "",
   name: "",
+  vendor: "",
+  type: "image",
   estimatedCostPerImageUsd: 0.03,
   estimatedLatencyMs: 4000
 };
+
+const modelTypeOptions: Array<{
+  label: string;
+  value: ApiProviderModelType;
+}> = [
+  { label: "Image", value: "image" },
+  { label: "Text", value: "text" },
+  { label: "Vision", value: "vision" },
+  { label: "Embedding", value: "embedding" },
+  { label: "Audio", value: "audio" },
+  { label: "Rerank", value: "rerank" },
+  { label: "Other", value: "other" }
+];
+
+const modelGroupByOptions: Array<{ label: string; value: ModelGroupBy }> = [
+  { label: "No grouping", value: "none" },
+  { label: "Group by vendor", value: "vendor" },
+  { label: "Group by type", value: "type" },
+  { label: "Group by status", value: "status" }
+];
 
 export function ProviderManagementPanel() {
   const queryClient = useQueryClient();
@@ -105,12 +139,17 @@ export function ProviderManagementPanel() {
     apiKeyTouched: false
   }));
   const [newModel, setNewModel] = useState<NewModelState>(emptyModel);
-  const [statusMessage, setStatusMessage] = useState("Provider settings are local to this API server session.");
+  const [modelGroupBy, setModelGroupBy] = useState<ModelGroupBy>("vendor");
+  const [modelVendorFilter, setModelVendorFilter] = useState("all");
+  const [modelTypeFilter, setModelTypeFilter] = useState("all");
+  const [statusMessage, setStatusMessage] = useState(
+    "Provider settings are local to this API server session."
+  );
 
   const selectedProvider =
     providers.find((provider) => provider.id === selectedProviderId) ??
     (isCreating ? undefined : providers[0]);
-  const formSourceId = isCreating ? "new" : selectedProvider?.id ?? "none";
+  const formSourceId = isCreating ? "new" : (selectedProvider?.id ?? "none");
   const defaultForm = useMemo(
     () =>
       isCreating || !selectedProvider
@@ -118,20 +157,16 @@ export function ProviderManagementPanel() {
         : formFromProvider(selectedProvider),
     [isCreating, selectedProvider]
   );
-  const form =
-    formDraft.sourceId === formSourceId ? formDraft.form : defaultForm;
+  const form = formDraft.sourceId === formSourceId ? formDraft.form : defaultForm;
   const apiKeyTouched =
     formDraft.sourceId === formSourceId ? formDraft.apiKeyTouched : false;
-  const setForm = (
-    updater: (current: ProviderFormState) => ProviderFormState
-  ) => {
+  const setForm = (updater: (current: ProviderFormState) => ProviderFormState) => {
     setFormDraft((current) => {
       const baseForm = current.sourceId === formSourceId ? current.form : defaultForm;
       return {
         sourceId: formSourceId,
         form: updater(baseForm),
-        apiKeyTouched:
-          current.sourceId === formSourceId ? current.apiKeyTouched : false
+        apiKeyTouched: current.sourceId === formSourceId ? current.apiKeyTouched : false
       };
     });
   };
@@ -154,7 +189,12 @@ export function ProviderManagementPanel() {
         provider.protocol,
         provider.imageProvider,
         provider.baseUrl,
-        ...provider.models.flatMap((model) => [model.id, model.name])
+        ...provider.models.flatMap((model) => [
+          model.id,
+          model.name,
+          model.vendor ?? "",
+          model.type ?? ""
+        ])
       ]
         .join(" ")
         .toLowerCase();
@@ -162,9 +202,34 @@ export function ProviderManagementPanel() {
     });
   }, [providers, searchText]);
 
+  const fetchModelsMutation = useMutation({
+    mutationFn: fetchApiProviderModels,
+    onSuccess: async ({
+      addedModelCount,
+      provider,
+      totalRemoteModelCount
+    }) => {
+      upsertProviderInCache(queryClient, provider);
+      setSelectedProviderId(provider.id);
+      setFormDraft(() => ({
+        sourceId: provider.id,
+        form: formFromProvider(provider),
+        apiKeyTouched: false
+      }));
+      setStatusMessage(modelFetchStatus(totalRemoteModelCount, addedModelCount));
+      await queryClient.invalidateQueries({ queryKey: ["api-providers"] });
+    },
+    onError: (error) => setStatusMessage(messageFromError(error))
+  });
+
   const createMutation = useMutation({
-    mutationFn: createApiProvider,
-    onSuccess: async ({ provider }) => {
+    mutationFn: ({
+      input
+    }: {
+      autoFetchModels: boolean;
+      input: ApiProviderInput;
+    }) => createApiProvider(input),
+    onSuccess: async ({ provider }, variables) => {
       upsertProviderInCache(queryClient, provider);
       setStatusMessage(`${provider.label} has been added.`);
       setSelectedProviderId(provider.id);
@@ -175,14 +240,21 @@ export function ProviderManagementPanel() {
       });
       setIsCreating(false);
       await queryClient.invalidateQueries({ queryKey: ["api-providers"] });
+      maybeFetchModels(fetchModelsMutation, provider, variables.autoFetchModels);
     },
     onError: (error) => setStatusMessage(messageFromError(error))
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, patch }: { id: string; patch: ApiProviderPatch }) =>
-      updateApiProvider(id, patch),
-    onSuccess: async ({ provider }) => {
+    mutationFn: ({
+      id,
+      patch
+    }: {
+      autoFetchModels: boolean;
+      id: string;
+      patch: ApiProviderPatch;
+    }) => updateApiProvider(id, patch),
+    onSuccess: async ({ provider }, variables) => {
       upsertProviderInCache(queryClient, provider);
       setFormDraft({
         sourceId: provider.id,
@@ -191,6 +263,7 @@ export function ProviderManagementPanel() {
       });
       setStatusMessage(`${provider.label} settings saved.`);
       await queryClient.invalidateQueries({ queryKey: ["api-providers"] });
+      maybeFetchModels(fetchModelsMutation, provider, variables.autoFetchModels);
     },
     onError: (error) => setStatusMessage(messageFromError(error))
   });
@@ -225,6 +298,9 @@ export function ProviderManagementPanel() {
 
   const formIssues = validateProviderForm(form);
   const saving = createMutation.isPending || updateMutation.isPending;
+  const hasUnsavedConnectionChanges =
+    Boolean(selectedProvider) &&
+    (form.baseUrl.trim() !== selectedProvider?.baseUrl || apiKeyTouched);
 
   const startCreate = () => {
     setFormDraft({
@@ -257,7 +333,10 @@ export function ProviderManagementPanel() {
     }
 
     if (isCreating) {
-      createMutation.mutate(providerInputFromForm(form));
+      createMutation.mutate({
+        autoFetchModels: Boolean(form.apiKey.trim() && form.baseUrl.trim()),
+        input: providerInputFromForm(form)
+      });
       return;
     }
 
@@ -266,9 +345,24 @@ export function ProviderManagementPanel() {
     }
 
     updateMutation.mutate({
+      autoFetchModels:
+        Boolean(form.baseUrl.trim()) &&
+        (apiKeyTouched || form.baseUrl.trim() !== selectedProvider.baseUrl),
       id: selectedProvider.id,
       patch: providerPatchFromForm(form, apiKeyTouched)
     });
+  };
+
+  const handleFetchModels = () => {
+    if (!selectedProvider) {
+      return;
+    }
+    if (hasUnsavedConnectionChanges) {
+      setStatusMessage("Save connection changes before fetching models.");
+      return;
+    }
+
+    fetchModelsMutation.mutate(selectedProvider.id);
   };
 
   const addModel = () => {
@@ -291,7 +385,9 @@ export function ProviderManagementPanel() {
           id,
           name,
           enabled: true,
-          capabilities: ["image-generation"],
+          vendor: newModel.vendor.trim() || inferApiProviderModelVendor(id, name),
+          type: newModel.type,
+          capabilities: apiProviderCapabilitiesForModelType(newModel.type),
           estimatedCostPerImageUsd: newModel.estimatedCostPerImageUsd,
           estimatedLatencyMs: Math.round(newModel.estimatedLatencyMs)
         }
@@ -309,12 +405,39 @@ export function ProviderManagementPanel() {
     }));
   };
 
+  const updateModelType = (modelId: string, type: ApiProviderModelType) => {
+    updateModel(modelId, {
+      type,
+      capabilities: apiProviderCapabilitiesForModelType(type)
+    });
+  };
+
   const removeModel = (modelId: string) => {
     setForm((current) => ({
       ...current,
       models: current.models.filter((model) => model.id !== modelId)
     }));
   };
+
+  const modelVendors = useMemo(
+    () => uniqueValues(form.models.map((model) => modelVendor(model))),
+    [form.models]
+  );
+  const modelTypes = useMemo(
+    () =>
+      Array.from(new Set(form.models.map((model) => modelType(model)))).sort(
+        (left, right) => left.localeCompare(right)
+      ),
+    [form.models]
+  );
+  const filteredModels = useMemo(
+    () => filterModels(form.models, modelVendorFilter, modelTypeFilter),
+    [form.models, modelTypeFilter, modelVendorFilter]
+  );
+  const modelGroups = useMemo(
+    () => groupModels(filteredModels, modelGroupBy),
+    [filteredModels, modelGroupBy]
+  );
 
   return (
     <Panel
@@ -366,8 +489,8 @@ export function ProviderManagementPanel() {
                 <span className="provider-list-item__body">
                   <strong>{provider.label}</strong>
                   <small>
-                    {provider.models.filter((model) => model.enabled).length} models
-                    · {protocolLabel(provider.protocol)}
+                    {provider.models.filter((model) => model.enabled).length} models ·{" "}
+                    {protocolLabel(provider.protocol)}
                   </small>
                 </span>
                 <span
@@ -549,71 +672,169 @@ export function ProviderManagementPanel() {
                   <h4>Models</h4>
                   <p>Enabled image models appear in Eval Setup.</p>
                 </div>
-                <Badge tone="info">{enabledImageModelCount(form.models)} active</Badge>
+                <div className="provider-section__actions">
+                  <Badge tone="info">{enabledImageModelCount(form.models)} active</Badge>
+                  {selectedProvider ? (
+                    <Button
+                      disabled={fetchModelsMutation.isPending || saving}
+                      loading={fetchModelsMutation.isPending}
+                      onClick={handleFetchModels}
+                      type="button"
+                      variant="secondary"
+                    >
+                      <RefreshCw aria-hidden="true" size={14} />
+                      Fetch models
+                    </Button>
+                  ) : null}
+                </div>
+              </div>
+
+              <div className="provider-model-controls">
+                <label className="provider-field">
+                  Classification
+                  <SelectControl
+                    onValueChange={(value) => setModelGroupBy(value as ModelGroupBy)}
+                    options={modelGroupByOptions}
+                    value={modelGroupBy}
+                  />
+                </label>
+                <label className="provider-field">
+                  Vendor
+                  <SelectControl
+                    onValueChange={setModelVendorFilter}
+                    options={[
+                      { label: "All vendors", value: "all" },
+                      ...modelVendors.map((vendor) => ({
+                        label: vendor,
+                        value: vendor
+                      }))
+                    ]}
+                    value={modelVendorFilter}
+                  />
+                </label>
+                <label className="provider-field">
+                  Type
+                  <SelectControl
+                    onValueChange={setModelTypeFilter}
+                    options={[
+                      { label: "All types", value: "all" },
+                      ...modelTypes.map((type) => ({
+                        label: modelTypeLabel(type),
+                        value: type
+                      }))
+                    ]}
+                    value={modelTypeFilter}
+                  />
+                </label>
               </div>
 
               <div className="provider-model-list">
-                {form.models.map((model) => (
-                  <div className="provider-model-row" key={model.id}>
-                    <CheckboxControl
-                      checked={model.enabled}
-                      onCheckedChange={(enabled) => updateModel(model.id, { enabled })}
-                    />
-                    <label className="provider-field">
-                      Model ID
-                      <TextInput
-                        onChange={(event) =>
-                          updateModel(model.id, { id: event.target.value })
-                        }
-                        value={model.id}
-                      />
-                    </label>
-                    <label className="provider-field">
-                      Display name
-                      <TextInput
-                        onChange={(event) =>
-                          updateModel(model.id, { name: event.target.value })
-                        }
-                        value={model.name}
-                      />
-                    </label>
-                    <label className="provider-field provider-field--number">
-                      Cost
-                      <TextInput
-                        min="0"
-                        onChange={(event) =>
-                          updateModel(model.id, {
-                            estimatedCostPerImageUsd: Number(event.target.value)
-                          })
-                        }
-                        step="0.001"
-                        type="number"
-                        value={model.estimatedCostPerImageUsd}
-                      />
-                    </label>
-                    <label className="provider-field provider-field--number">
-                      Latency
-                      <TextInput
-                        min="0"
-                        onChange={(event) =>
-                          updateModel(model.id, {
-                            estimatedLatencyMs: Number(event.target.value)
-                          })
-                        }
-                        step="100"
-                        type="number"
-                        value={model.estimatedLatencyMs}
-                      />
-                    </label>
-                    <Button
-                      aria-label={`Remove ${model.name}`}
-                      onClick={() => removeModel(model.id)}
-                      size="icon-sm"
-                      type="button"
-                      variant="ghost"
-                    >
-                      <Trash2 aria-hidden="true" size={14} />
-                    </Button>
+                {form.models.length === 0 ? (
+                  <div className="provider-model-empty">
+                    No models yet. Fetch them from the saved Base URL or add one
+                    manually.
+                  </div>
+                ) : null}
+                {form.models.length > 0 && filteredModels.length === 0 ? (
+                  <div className="provider-model-empty">
+                    No models match the selected classification filters.
+                  </div>
+                ) : null}
+                {modelGroups.map((group) => (
+                  <div className="provider-model-group" key={group.key}>
+                    {modelGroupBy !== "none" ? (
+                      <div className="provider-model-group__header">
+                        <strong>{group.label}</strong>
+                        <span>
+                          {group.models.length}{" "}
+                          {group.models.length === 1 ? "model" : "models"}
+                        </span>
+                      </div>
+                    ) : null}
+                    {group.models.map((model) => (
+                      <div className="provider-model-row" key={model.id}>
+                        <CheckboxControl
+                          checked={model.enabled}
+                          onCheckedChange={(enabled) =>
+                            updateModel(model.id, { enabled })
+                          }
+                        />
+                        <label className="provider-field">
+                          Model ID
+                          <TextInput
+                            onChange={(event) =>
+                              updateModel(model.id, { id: event.target.value })
+                            }
+                            value={model.id}
+                          />
+                        </label>
+                        <label className="provider-field">
+                          Display name
+                          <TextInput
+                            onChange={(event) =>
+                              updateModel(model.id, { name: event.target.value })
+                            }
+                            value={model.name}
+                          />
+                        </label>
+                        <label className="provider-field">
+                          Vendor
+                          <TextInput
+                            onChange={(event) =>
+                              updateModel(model.id, { vendor: event.target.value })
+                            }
+                            value={modelVendor(model)}
+                          />
+                        </label>
+                        <label className="provider-field">
+                          Type
+                          <SelectControl
+                            onValueChange={(value) =>
+                              updateModelType(model.id, value as ApiProviderModelType)
+                            }
+                            options={modelTypeOptions}
+                            value={modelType(model)}
+                          />
+                        </label>
+                        <label className="provider-field provider-field--number">
+                          Cost
+                          <TextInput
+                            min="0"
+                            onChange={(event) =>
+                              updateModel(model.id, {
+                                estimatedCostPerImageUsd: Number(event.target.value)
+                              })
+                            }
+                            step="0.001"
+                            type="number"
+                            value={model.estimatedCostPerImageUsd}
+                          />
+                        </label>
+                        <label className="provider-field provider-field--number">
+                          Latency
+                          <TextInput
+                            min="0"
+                            onChange={(event) =>
+                              updateModel(model.id, {
+                                estimatedLatencyMs: Number(event.target.value)
+                              })
+                            }
+                            step="100"
+                            type="number"
+                            value={model.estimatedLatencyMs}
+                          />
+                        </label>
+                        <Button
+                          aria-label={`Remove ${model.name}`}
+                          onClick={() => removeModel(model.id)}
+                          size="icon-sm"
+                          type="button"
+                          variant="ghost"
+                        >
+                          <Trash2 aria-hidden="true" size={14} />
+                        </Button>
+                      </div>
+                    ))}
                   </div>
                 ))}
               </div>
@@ -638,6 +859,26 @@ export function ProviderManagementPanel() {
                   }
                   placeholder="Display name"
                   value={newModel.name}
+                />
+                <TextInput
+                  onChange={(event) =>
+                    setNewModel((current) => ({
+                      ...current,
+                      vendor: event.target.value
+                    }))
+                  }
+                  placeholder="Vendor"
+                  value={newModel.vendor}
+                />
+                <SelectControl
+                  onValueChange={(value) =>
+                    setNewModel((current) => ({
+                      ...current,
+                      type: value as ApiProviderModelType
+                    }))
+                  }
+                  options={modelTypeOptions}
+                  value={newModel.type}
                 />
                 <TextInput
                   min="0"
@@ -674,7 +915,10 @@ export function ProviderManagementPanel() {
               <section className="provider-section provider-section--danger">
                 <div>
                   <h4>Delete provider</h4>
-                  <p>Removing a provider also removes its models from future setup choices.</p>
+                  <p>
+                    Removing a provider also removes its models from future setup
+                    choices.
+                  </p>
                 </div>
                 <Button
                   disabled={deleteMutation.isPending}
@@ -741,16 +985,7 @@ function newProviderForm(): ProviderFormState {
     docsUrl: "",
     enabled: false,
     apiKey: "",
-    models: [
-      {
-        id: "custom-image",
-        name: "Custom Image",
-        enabled: true,
-        capabilities: ["image-generation"],
-        estimatedCostPerImageUsd: 0.03,
-        estimatedLatencyMs: 4000
-      }
-    ]
+    models: []
   };
 }
 
@@ -800,14 +1035,27 @@ function providerPatchFromForm(
 
 function normalizeModels(models: ApiProviderModel[]) {
   return models
-    .map((model) => ({
-      id: model.id.trim(),
-      name: model.name.trim() || model.id.trim(),
-      enabled: model.enabled,
-      capabilities: model.capabilities,
-      estimatedCostPerImageUsd: Number(model.estimatedCostPerImageUsd) || 0,
-      estimatedLatencyMs: Math.max(0, Math.round(Number(model.estimatedLatencyMs) || 0))
-    }))
+    .map((model) => {
+      const id = model.id.trim();
+      const name = model.name.trim() || id;
+      const type = inferApiProviderModelType(id, name, model.type);
+      return {
+        id,
+        name,
+        enabled: model.enabled,
+        vendor: inferApiProviderModelVendor(id, name, model.vendor),
+        type,
+        capabilities:
+          model.capabilities?.length > 0
+            ? model.capabilities
+            : apiProviderCapabilitiesForModelType(type),
+        estimatedCostPerImageUsd: Number(model.estimatedCostPerImageUsd) || 0,
+        estimatedLatencyMs: Math.max(
+          0,
+          Math.round(Number(model.estimatedLatencyMs) || 0)
+        )
+      };
+    })
     .filter((model) => model.id.length > 0);
 }
 
@@ -819,9 +1067,6 @@ function validateProviderForm(form: ProviderFormState) {
   if (!form.baseUrl.trim()) {
     issues.push("Base URL is required.");
   }
-  if (normalizeModels(form.models).length === 0) {
-    issues.push("Add at least one model.");
-  }
   return issues;
 }
 
@@ -829,6 +1074,78 @@ function enabledImageModelCount(models: ApiProviderModel[]) {
   return models.filter(
     (model) => model.enabled && model.capabilities.includes("image-generation")
   ).length;
+}
+
+function filterModels(
+  models: ApiProviderModel[],
+  vendorFilter: string,
+  typeFilter: string
+) {
+  return models.filter(
+    (model) =>
+      (vendorFilter === "all" || modelVendor(model) === vendorFilter) &&
+      (typeFilter === "all" || modelType(model) === typeFilter)
+  );
+}
+
+function groupModels(models: ApiProviderModel[], groupBy: ModelGroupBy) {
+  if (groupBy === "none") {
+    return [{ key: "all", label: "All models", models }];
+  }
+
+  const groups = new Map<string, ApiProviderModel[]>();
+  for (const model of models) {
+    const key = modelGroupKey(model, groupBy);
+    groups.set(key, [...(groups.get(key) ?? []), model]);
+  }
+
+  return Array.from(groups.entries())
+    .map(([key, groupModels]) => ({
+      key,
+      label: modelGroupLabel(key, groupBy),
+      models: groupModels
+    }))
+    .sort((left, right) => left.label.localeCompare(right.label));
+}
+
+function modelGroupKey(model: ApiProviderModel, groupBy: Exclude<ModelGroupBy, "none">) {
+  switch (groupBy) {
+    case "vendor":
+      return modelVendor(model);
+    case "type":
+      return modelType(model);
+    case "status":
+      return model.enabled ? "enabled" : "disabled";
+  }
+}
+
+function modelGroupLabel(key: string, groupBy: Exclude<ModelGroupBy, "none">) {
+  switch (groupBy) {
+    case "vendor":
+      return key;
+    case "type":
+      return modelTypeLabel(key as ApiProviderModelType);
+    case "status":
+      return key === "enabled" ? "Enabled" : "Disabled";
+  }
+}
+
+function modelVendor(model: ApiProviderModel) {
+  return inferApiProviderModelVendor(model.id, model.name, model.vendor);
+}
+
+function modelType(model: ApiProviderModel): ApiProviderModelType {
+  return inferApiProviderModelType(model.id, model.name, model.type);
+}
+
+function modelTypeLabel(type: ApiProviderModelType) {
+  return modelTypeOptions.find((option) => option.value === type)?.label ?? "Other";
+}
+
+function uniqueValues(values: string[]) {
+  return Array.from(new Set(values.filter(Boolean))).sort((left, right) =>
+    left.localeCompare(right)
+  );
 }
 
 function protocolLabel(protocol: ApiProviderProtocol) {
@@ -840,6 +1157,30 @@ function protocolLabel(protocol: ApiProviderProtocol) {
     case "anthropic-messages":
       return "Anthropic Messages";
   }
+}
+
+function maybeFetchModels(
+  mutation: { mutateAsync: (providerId: string) => Promise<unknown> },
+  provider: ApiProvider,
+  shouldFetch: boolean
+) {
+  if (!shouldFetch || provider.credential.status === "not_configured") {
+    return;
+  }
+
+  void mutation.mutateAsync(provider.id).catch(() => undefined);
+}
+
+function modelFetchStatus(totalRemoteModelCount: number, addedModelCount: number) {
+  const remoteLabel =
+    totalRemoteModelCount === 1 ? "1 remote model" : `${totalRemoteModelCount} remote models`;
+  if (addedModelCount === 0) {
+    return `Fetched ${remoteLabel}; no new models were added.`;
+  }
+
+  const addedLabel =
+    addedModelCount === 1 ? "1 new model" : `${addedModelCount} new models`;
+  return `Fetched ${remoteLabel}; added ${addedLabel}.`;
 }
 
 function messageFromError(error: unknown) {

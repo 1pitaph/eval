@@ -79,12 +79,7 @@ export function ButtonLink({
   variant = "secondary",
   ...props
 }: ButtonLinkProps) {
-  const classes = cn(
-    "ui-button",
-    "coss-button",
-    `ui-button--${variant}`,
-    className
-  );
+  const classes = cn("ui-button", "coss-button", `ui-button--${variant}`, className);
 
   return (
     <CossButton

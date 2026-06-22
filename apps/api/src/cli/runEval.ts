@@ -1,4 +1,5 @@
 import { readFile, writeFile } from "node:fs/promises";
+import { isAbsolute, resolve } from "node:path";
 import { nanoid } from "nanoid";
 import { runImageEvalSpec } from "../services/imageEvalRunner";
 import { resolveEvalSpecFromPayload } from "../services/workflowImport";
@@ -17,7 +18,9 @@ async function main() {
     );
   }
 
-  const payload = JSON.parse(await readFile(options.input, "utf8")) as unknown;
+  const payload = JSON.parse(
+    await readFile(resolveCliPath(options.input), "utf8")
+  ) as unknown;
   const resolved = resolveEvalSpecFromPayload(payload);
   const createdAt = new Date().toISOString();
   const run = runImageEvalSpec(
@@ -28,7 +31,7 @@ async function main() {
   const output = `${JSON.stringify(run, null, 2)}\n`;
 
   if (options.output) {
-    await writeFile(options.output, output, "utf8");
+    await writeFile(resolveCliPath(options.output), output, "utf8");
   } else {
     process.stdout.write(output);
   }
@@ -83,6 +86,14 @@ function requireValue(flag: string, value: string | undefined) {
   }
 
   return value;
+}
+
+function resolveCliPath(path: string) {
+  if (isAbsolute(path)) {
+    return path;
+  }
+
+  return resolve(process.env.INIT_CWD ?? process.cwd(), path);
 }
 
 main().catch((error: unknown) => {

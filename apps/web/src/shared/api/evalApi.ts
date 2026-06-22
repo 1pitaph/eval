@@ -1,6 +1,7 @@
 import type {
   ApiProvider,
   ApiProviderInput,
+  ApiProviderModel,
   ApiProviderPatch,
   EvalRunRecord,
   EvalRunSpec,
@@ -28,9 +29,17 @@ export type CompileResponse =
     };
 
 export type RunResponse =
+  {
+    run: EvalRunRecord;
+    warnings: Array<{ code: string; message: string; nodeId?: string }>;
+  };
+
+export type StartRunResponse =
   | {
-      run: EvalRunRecord;
+      runId: string;
+      status: EvalRunRecord["status"];
       warnings: Array<{ code: string; message: string; nodeId?: string }>;
+      manifest: EvalRunSpec["manifest"];
     }
   | CompileResponse;
 
@@ -121,6 +130,14 @@ export type ApiProviderListResponse = {
 
 export type ApiProviderResponse = {
   provider: ApiProvider;
+};
+
+export type ApiProviderModelSyncResponse = {
+  addedModelCount: number;
+  models: ApiProviderModel[];
+  provider: ApiProvider;
+  sourceUrl: string;
+  totalRemoteModelCount: number;
 };
 
 async function getJson<T>(path: string): Promise<T> {
@@ -217,7 +234,23 @@ export function compileWorkflow(draft: WorkflowDraft) {
 }
 
 export function startRun(draft: WorkflowDraft) {
-  return postJson<RunResponse>("/runs", draft);
+  return postJson<StartRunResponse>("/runs", draft);
+}
+
+export function getRun(runId: string) {
+  return getJson<EvalRunRecord>(`/runs/${runId}`);
+}
+
+export function retryRun(runId: string) {
+  return postReviewJson<RunResponse>(`/runs/${runId}/retry`, {});
+}
+
+export function cancelRun(runId: string) {
+  return postReviewJson<RunResponse>(`/runs/${runId}/cancel`, {});
+}
+
+export function runEventsUrl(runId: string) {
+  return `${API_BASE_URL}/runs/${runId}/events`;
 }
 
 export function listApiProviders() {
@@ -238,6 +271,10 @@ export function deleteApiProvider(id: string) {
 
 export function testApiProviderConnection(id: string) {
   return postReviewJson<ApiProviderResponse>(`/providers/${id}/test`, {});
+}
+
+export function fetchApiProviderModels(id: string) {
+  return postReviewJson<ApiProviderModelSyncResponse>(`/providers/${id}/models`, {});
 }
 
 export function exportRunUrl(runId: string, format: "csv" | "json") {

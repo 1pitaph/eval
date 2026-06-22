@@ -1,17 +1,39 @@
-import { AlertCircle, CheckCircle2, Clock3, FileCode2 } from "lucide-react";
-import type { EvalSpecManifest } from "@eval/workflow-schema";
-import { Badge, Panel } from "@eval/ui";
+import {
+  AlertCircle,
+  CheckCircle2,
+  Clock3,
+  FileCode2,
+  RotateCcw,
+  Square
+} from "lucide-react";
+import type { EvalRunRecord, EvalSpecManifest, EvalTaskRecord } from "@eval/workflow-schema";
+import { Badge, Button, Panel } from "@eval/ui";
+import { cancelRun, retryRun } from "../../../shared/api/evalApi";
 import { useWorkflowStore } from "../state/workflowStore";
 
 export function RunPanel() {
   const compileResult = useWorkflowStore((state) => state.compileResult);
   const runResult = useWorkflowStore((state) => state.runResult);
+  const setRunResult = useWorkflowStore((state) => state.setRunResult);
+  const run = runResult && "run" in runResult ? runResult.run : undefined;
   const manifest =
     compileResult?.ok === true
       ? compileResult.spec.manifest
-      : runResult && "run" in runResult
-        ? runResult.run.spec.manifest
+      : run
+        ? run.spec.manifest
         : undefined;
+  const handleRetry = async () => {
+    if (!run) {
+      return;
+    }
+    setRunResult(await retryRun(run.id));
+  };
+  const handleCancel = async () => {
+    if (!run) {
+      return;
+    }
+    setRunResult(await cancelRun(run.id));
+  };
 
   return (
     <Panel className="run-panel" title="Run Status">
@@ -52,24 +74,41 @@ export function RunPanel() {
 
       {manifest ? <ManifestPreview manifest={manifest} /> : null}
 
-      {runResult && "run" in runResult ? (
+      {run ? (
         <div className="run-panel__section">
           <h3>
             <Clock3 aria-hidden="true" size={16} />
             Latest Run
           </h3>
           <div className="run-panel__grid">
-            <Metric label="Run ID" value={runResult.run.id.slice(0, 8)} />
-            <Metric label="Tasks" value={String(runResult.run.summary.taskCount)} />
+            <Metric label="Run ID" value={run.id.slice(0, 8)} />
+            <Metric label="Status" value={run.status} />
+            <Metric label="Tasks" value={String(run.summary.taskCount)} />
             <Metric
               label="Artifacts"
-              value={String(runResult.run.summary.artifactCount)}
+              value={String(run.summary.artifactCount)}
             />
             <Metric
               label="Est. cost"
-              value={`$${runResult.run.summary.estimatedCostUsd.toFixed(2)}`}
+              value={`$${run.summary.estimatedCostUsd.toFixed(2)}`}
             />
           </div>
+          <div className="run-panel__actions">
+            {run.status === "failed" ? (
+              <Button onClick={handleRetry} size="sm" variant="secondary">
+                <RotateCcw aria-hidden="true" size={14} />
+                Retry
+              </Button>
+            ) : null}
+            {["queued", "running", "waiting_human"].includes(run.status) ? (
+              <Button onClick={handleCancel} size="sm" variant="ghost">
+                <Square aria-hidden="true" size={14} />
+                Cancel
+              </Button>
+            ) : null}
+          </div>
+          <TaskTimeline run={run} />
+          <RunEvents run={run} />
         </div>
       ) : null}
     </Panel>
@@ -140,6 +179,111 @@ function Metric({ label, value }: { label: string; value: string }) {
       <strong>{value}</strong>
     </div>
   );
+}
+
+function TaskTimeline({ run }: { run: EvalRunRecord }) {
+  if (run.tasks.length === 0) {
+    return (
+      <div className="manifest-issues">
+        {run.events.slice(-3).map((event) => (
+          <div key={event.id}>
+            <Badge tone={eventTone(event.level)}>{event.level}</Badge>
+            <span>{event.message}</span>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <ol className="run-timeline">
+      {run.tasks
+        .slice()
+        .sort((left, right) => taskOrder(left) - taskOrder(right))
+        .map((task) => (
+          <li key={task.id} className="run-timeline__item">
+            <div>
+              <strong>{taskLabel(task)}</strong>
+              <span>
+                attempt {task.attempt}/{task.maxAttempts}
+              </span>
+            </div>
+            <Badge tone={taskTone(task.status)}>{task.status}</Badge>
+            {task.error ? <p>{task.error.message}</p> : null}
+          </li>
+        ))}
+    </ol>
+  );
+}
+
+function RunEvents({ run }: { run: EvalRunRecord }) {
+  return (
+    <div className="manifest-issues">
+      {run.events.slice(-4).map((event) => (
+        <div key={event.id}>
+          <Badge tone={eventTone(event.level)}>{event.level}</Badge>
+          <span>{event.message}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function taskLabel(task: EvalTaskRecord) {
+  switch (task.kind) {
+    case "generation":
+      return "Generation";
+    case "metric":
+      return "Automatic metrics";
+    case "human_review":
+      return "Human review";
+    case "aggregation":
+      return "Aggregation";
+    case "release_gate":
+      return "Release gate";
+  }
+}
+
+function taskOrder(task: EvalTaskRecord) {
+  switch (task.kind) {
+    case "generation":
+      return 1;
+    case "metric":
+      return 2;
+    case "human_review":
+      return 3;
+    case "aggregation":
+      return 4;
+    case "release_gate":
+      return 5;
+  }
+}
+
+function taskTone(status: EvalTaskRecord["status"]) {
+  switch (status) {
+    case "succeeded":
+      return "success";
+    case "running":
+    case "queued":
+      return "info";
+    case "failed":
+      return "danger";
+    case "canceled":
+      return "neutral";
+  }
+}
+
+function eventTone(level: EvalRunRecord["events"][number]["level"]) {
+  switch (level) {
+    case "success":
+      return "success";
+    case "warning":
+      return "warning";
+    case "error":
+      return "danger";
+    case "info":
+      return "info";
+  }
 }
 
 function issueTone(severity: EvalSpecManifest["issues"][number]["severity"]) {

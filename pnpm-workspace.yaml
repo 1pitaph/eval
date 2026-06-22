@@ -3,6 +3,7 @@ packages:
   - "packages/*"
   - "workers/*"
 allowBuilds:
+  electron-winstaller: true
   esbuild: true
 minimumReleaseAgeExclude:
   - prettier@3.8.4

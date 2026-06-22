@@ -4,17 +4,21 @@
   "type": "module",
   "packageManager": "pnpm@11.4.0",
   "engines": {
-    "node": ">=22.0.0"
+    "node": ">=22.12.0"
   },
   "scripts": {
     "build": "pnpm -r --if-present build",
     "dev": "pnpm --parallel --no-bail --filter @eval/web --filter @eval/api dev",
     "dev:api": "pnpm --filter @eval/api dev",
+    "dev:desktop": "pnpm --filter @eval/web build && pnpm --filter @eval/desktop dev",
     "dev:web": "pnpm --filter @eval/web dev",
+    "build:desktop": "pnpm --filter @eval/web build && pnpm --filter @eval/desktop build",
+    "dist:desktop": "pnpm --filter @eval/web build && pnpm --filter @eval/desktop dist",
+    "dist:desktop:release": "pnpm --filter @eval/web build && pnpm --filter @eval/desktop dist:signed",
     "format": "prettier --check .",
     "format:write": "prettier --write .",
     "lint": "eslint .",
-    "test": "pnpm -r --if-present test",
+    "test": "vitest run",
     "typecheck": "pnpm -r --if-present typecheck"
   },
   "devDependencies": {

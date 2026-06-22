@@ -1,7 +1,5 @@
 import {
   addEdge,
-  applyEdgeChanges,
-  applyNodeChanges,
   type Connection,
   type Edge,
   type EdgeChange,
@@ -116,15 +114,14 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
       edges: addEdge({ ...connection, id }, state.edges)
     }));
   },
-  onEdgesChange: (changes) => {
-    set((state) => ({
-      edges: applyEdgeChanges(changes, state.edges)
-    }));
+  onEdgesChange: () => {
+    // Edges are authored from workflow data rather than direct canvas gestures.
+    // Keep React Flow lifecycle changes local to the rendered instance.
   },
-  onNodesChange: (changes) => {
-    set((state) => ({
-      nodes: applyNodeChanges(changes, state.nodes)
-    }));
+  onNodesChange: () => {
+    // Nodes are laid out from workflow data and are not directly editable on canvas.
+    // React Flow can emit lifecycle changes while the expanded canvas unmounts; those
+    // should never mutate the persisted workflow draft backing the home pipeline.
   },
   selectNode: (nodeId) => {
     set({ selectedNodeId: nodeId });

@@ -152,8 +152,10 @@ export function runImageEvalSpec(
   spec: EvalRunSpec,
   id: string,
   createdAt: string,
-  apiProviders: ApiProvider[] = []
+  apiProviders: ApiProvider[] = [],
+  options: { includeMockHumanReviews?: boolean } = {}
 ): EvalRunRecord {
+  const includeMockHumanReviews = options.includeMockHumanReviews ?? true;
   const datasetConfig = getNodeConfig(spec, "dataset.prompt_set");
   const promptTemplateConfig = getNodeConfig(spec, "prompt.template");
   const generationConfig = getNodeConfig(spec, "generation.model_fanout");
@@ -261,18 +263,20 @@ export function runImageEvalSpec(
         jobs.push(job);
         artifacts.push(artifact);
         scores.push(...artifactScores);
-        reviews.push({
-          id: `review-${artifactId}`,
-          artifactId,
-          reviewer,
-          blind: true,
-          verdict:
-            humanScore >= 0.76 ? "pass" : humanScore >= 0.64 ? "needs_review" : "fail",
-          score: roundScore(humanScore),
-          comment: reviewComment(humanScore, artifact, prompt),
-          tags: reviewTags(humanScore, artifactScores),
-          createdAt
-        });
+        if (includeMockHumanReviews) {
+          reviews.push({
+            id: `review-${artifactId}`,
+            artifactId,
+            reviewer,
+            blind: true,
+            verdict:
+              humanScore >= 0.76 ? "pass" : humanScore >= 0.64 ? "needs_review" : "fail",
+            score: roundScore(humanScore),
+            comment: reviewComment(humanScore, artifact, prompt),
+            tags: reviewTags(humanScore, artifactScores),
+            createdAt
+          });
+        }
       }
     }
   }
@@ -287,9 +291,11 @@ export function runImageEvalSpec(
   return {
     id,
     createdAt,
+    updatedAt: createdAt,
     status: "succeeded",
     spec,
     summary,
+    tasks: [],
     jobs,
     artifacts,
     scores,
