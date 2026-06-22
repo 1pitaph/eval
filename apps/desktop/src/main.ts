@@ -34,6 +34,7 @@ let localApi: Awaited<ReturnType<typeof createApiApp>> | undefined;
 let desktopStore: ReturnType<typeof createSqliteStore> | undefined;
 
 app.setName("Eval Studio");
+process.env.EVAL_IMAGE_ADAPTER ??= "openai-live";
 
 const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) {

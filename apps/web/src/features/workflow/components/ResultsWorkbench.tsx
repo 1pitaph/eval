@@ -310,6 +310,16 @@ function GalleryTab({
   setLightboxArtifactId: (artifactId: string) => void;
   setReviewDrafts: Dispatch<SetStateAction<Record<string, ReviewDraft>>>;
 }) {
+  if (artifacts.length === 0) {
+    return (
+      <div className="artifact-grid-empty">
+        <GalleryVerticalEnd aria-hidden="true" size={26} />
+        <strong>No artifacts match these filters.</strong>
+        <span>Try another model or turn off Approved only.</span>
+      </div>
+    );
+  }
+
   return (
     <div className="artifact-grid">
       {artifacts.map((artifact) => (
@@ -319,8 +329,10 @@ function GalleryTab({
             onClick={() => setLightboxArtifactId(artifact.id)}
             type="button"
           >
-            <img
+            <ArtifactImage
+              className="artifact-card__image"
               alt={`${artifact.model} result for ${artifact.promptId}`}
+              fallbackLabel={artifact.model}
               src={artifact.thumbnailUri}
             />
           </button>
@@ -345,6 +357,39 @@ function GalleryTab({
         </article>
       ))}
     </div>
+  );
+}
+
+function ArtifactImage({
+  alt,
+  className,
+  fallbackLabel,
+  src
+}: {
+  alt: string;
+  className: string;
+  fallbackLabel: string;
+  src: string;
+}) {
+  const imageSrc = src.trim();
+  const [failedSrc, setFailedSrc] = useState("");
+  if (!imageSrc || failedSrc === imageSrc) {
+    return (
+      <div className={`artifact-image-fallback ${className}`} role="img" aria-label={alt}>
+        <GalleryVerticalEnd aria-hidden="true" size={22} />
+        <span>{fallbackLabel}</span>
+      </div>
+    );
+  }
+
+  return (
+    <img
+      alt={alt}
+      className={className}
+      loading="lazy"
+      onError={() => setFailedSrc(imageSrc)}
+      src={imageSrc}
+    />
   );
 }
 
@@ -456,7 +501,12 @@ function CompareArtifact({
   return (
     <article className={`compare-artifact ${isPreferred ? "is-preferred" : ""}`}>
       <button onClick={() => setLightboxArtifactId(artifact.id)} type="button">
-        <img alt={`${artifact.model} comparison result`} src={artifact.uri} />
+        <ArtifactImage
+          className="compare-artifact__image"
+          alt={`${artifact.model} comparison result`}
+          fallbackLabel={artifact.model}
+          src={artifact.uri}
+        />
       </button>
       <div>
         <strong>{artifact.model}</strong>
@@ -531,8 +581,10 @@ function HumanReviewTab({
         return (
           <div className="human-review-row" key={artifact.id}>
             <button onClick={() => setLightboxArtifactId(artifact.id)} type="button">
-              <img
+              <ArtifactImage
+                className="human-review-row__image"
                 alt={`${artifact.model} review thumbnail`}
+                fallbackLabel={artifact.model}
                 src={artifact.thumbnailUri}
               />
             </button>
@@ -592,7 +644,12 @@ function ArtifactLightbox({
         >
           Close
         </Button>
-        <img alt={`${artifact.model} full result`} src={artifact.uri} />
+        <ArtifactImage
+          className="artifact-lightbox__image"
+          alt={`${artifact.model} full result`}
+          fallbackLabel={artifact.model}
+          src={artifact.uri}
+        />
         <div className="artifact-lightbox__details">
           <div>
             <DialogTitle>{artifact.model}</DialogTitle>

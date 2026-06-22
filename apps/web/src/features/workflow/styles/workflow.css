@@ -1759,12 +1759,36 @@ a {
   padding-right: 2px;
 }
 
+.artifact-grid-empty {
+  align-items: center;
+  background: #fafafa;
+  border: 1px dashed #d4d4d8;
+  border-radius: 8px;
+  color: #71717a;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  justify-content: center;
+  min-height: 220px;
+  padding: 18px;
+  text-align: center;
+}
+
+.artifact-grid-empty strong {
+  color: #27272a;
+  font-size: 14px;
+}
+
+.artifact-grid-empty span {
+  font-size: 12px;
+}
+
 .artifact-card {
   background: #ffffff;
   border: 1px solid #e4e4e7;
   border-radius: 8px;
   display: grid;
-  grid-template-rows: 145px minmax(0, auto);
+  grid-template-rows: auto minmax(0, auto);
   min-width: 0;
   overflow: hidden;
 }
@@ -1775,14 +1799,49 @@ a {
   cursor: pointer;
   display: block;
   min-height: 0;
+  overflow: hidden;
   padding: 0;
+  width: 100%;
+  aspect-ratio: 1 / 1;
 }
 
-.artifact-card__image-button img {
+.artifact-card__image {
   display: block;
-  height: 145px;
+  height: 100%;
   object-fit: cover;
   width: 100%;
+}
+
+.artifact-image-fallback {
+  align-items: center;
+  background:
+    linear-gradient(135deg, rgba(244, 244, 245, 0.94), rgba(255, 255, 255, 0.72)),
+    repeating-linear-gradient(
+      -45deg,
+      rgba(212, 212, 216, 0.36) 0,
+      rgba(212, 212, 216, 0.36) 1px,
+      transparent 1px,
+      transparent 10px
+    );
+  color: #71717a;
+  display: flex;
+  flex-direction: column;
+  font-size: 12px;
+  font-weight: 800;
+  gap: 7px;
+  justify-content: center;
+  line-height: 1.2;
+  min-width: 0;
+  overflow: hidden;
+  padding: 10px;
+  text-align: center;
+}
+
+.artifact-image-fallback span {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .artifact-card__body {
@@ -1927,7 +1986,7 @@ a {
   padding: 0;
 }
 
-.compare-artifact img {
+.compare-artifact__image {
   display: block;
   height: 210px;
   object-fit: cover;
@@ -2083,12 +2142,29 @@ a {
   padding: 0;
 }
 
-.human-review-row img {
+.human-review-row__image {
   border-radius: 6px;
-  display: block;
   height: 56px;
   object-fit: cover;
   width: 56px;
+}
+
+img.human-review-row__image {
+  display: block;
+}
+
+.artifact-image-fallback.human-review-row__image {
+  gap: 2px;
+  padding: 5px;
+}
+
+.artifact-image-fallback.human-review-row__image svg {
+  height: 15px;
+  width: 15px;
+}
+
+.artifact-image-fallback.human-review-row__image span {
+  font-size: 8px;
 }
 
 .human-review-row div {
@@ -2135,12 +2211,16 @@ a {
   width: 100%;
 }
 
-.artifact-lightbox > img {
+.artifact-lightbox__image {
   background: #f4f4f5;
   height: 100%;
   max-height: inherit;
   object-fit: cover;
   width: 100%;
+}
+
+.artifact-image-fallback.artifact-lightbox__image {
+  min-height: 420px;
 }
 
 .lightbox-close {
@@ -3479,10 +3559,11 @@ textarea:focus-visible {
 }
 
 .asset-slot img,
-.artifact-card__image-button img,
-.compare-artifact img,
-.human-review-row img,
-.artifact-lightbox > img,
+.artifact-card__image,
+.compare-artifact__image,
+.human-review-row__image,
+.artifact-lightbox__image,
+.artifact-image-fallback,
 .blind-image-choice img {
   background: var(--secondary);
 }
@@ -5124,6 +5205,21 @@ textarea:focus-visible {
   font-weight: 800;
 }
 
+.model-list-filter-row {
+  align-items: end;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(180px, 260px) minmax(0, 1fr);
+}
+
+.model-list-filter-row > span {
+  color: #71717a;
+  font-size: 13px;
+  font-weight: 700;
+  justify-self: end;
+  padding-bottom: 10px;
+}
+
 .metric-token {
   display: grid;
   gap: 3px;
@@ -5154,6 +5250,20 @@ textarea:focus-visible {
 .model-choice--visual.is-selected {
   background: #f0fdfa;
   border-color: #99f6e4;
+}
+
+.model-choice-empty {
+  align-items: center;
+  background: #fafafa;
+  border: 1px dashed #d4d4d8;
+  border-radius: 8px;
+  color: #71717a;
+  display: flex;
+  font-size: 13px;
+  font-weight: 700;
+  justify-content: center;
+  min-height: 56px;
+  padding: 10px;
 }
 
 .custom-model-row {
@@ -5613,8 +5723,14 @@ textarea:focus-visible {
   }
 
   .prompt-card > header > div,
+  .model-list-filter-row,
   .custom-model-row {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .model-list-filter-row > span {
+    justify-self: start;
+    padding-bottom: 0;
   }
 
   .custom-model-row {

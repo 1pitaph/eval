@@ -52,14 +52,14 @@ export const openAiImageGenerationAdapter: ImageGenerationAdapter = {
       if (!secret?.apiKey) {
         throw new AdapterExecutionError(
           "provider_credential_missing",
-          `${job.provider} needs a valid API key before generation can start.`,
+          `${job.model} needs a valid API key before generation can start.`,
           false
         );
       }
-      if (job.provider !== "openai") {
+      if (!isOpenAiImageCompatible(secret.provider)) {
         throw new AdapterExecutionError(
           "provider_not_supported",
-          `The live adapter currently supports OpenAI image providers only; "${job.provider}" is configured for ${job.model}.`,
+          `${secret.provider.label} is not configured as an OpenAI-compatible image provider for ${job.model}.`,
           false
         );
       }
@@ -76,7 +76,7 @@ export const openAiImageGenerationAdapter: ImageGenerationAdapter = {
         thumbnailUri: imageUri,
         lineage: {
           ...artifact.lineage,
-          source: "openai-live-adapter"
+          source: "openai-compatible-live-adapter"
         }
       });
     }
@@ -126,10 +126,27 @@ export class AdapterExecutionError extends Error {
 }
 
 function secretForJob(job: ImageGenerationJob, providerSecrets: ProviderSecret[]) {
+  const normalizedModel = job.model.toLowerCase();
   return providerSecrets.find(
     (secret) =>
-      secret.provider.imageProvider === job.provider &&
-      secret.provider.models.some((model) => model.id === job.model)
+      secret.provider.models.some(
+        (model) => {
+          const normalizedId = model.id.toLowerCase();
+          const normalizedName = model.name.toLowerCase();
+          return (
+            model.enabled &&
+            model.capabilities.includes("image-generation") &&
+            (normalizedId === normalizedModel || normalizedName === normalizedModel)
+          );
+        }
+      )
+  );
+}
+
+function isOpenAiImageCompatible(provider: ApiProvider) {
+  return (
+    provider.protocol === "openai-responses" &&
+    (provider.imageProvider === "openai" || provider.imageProvider === "custom")
   );
 }
 
@@ -162,27 +179,66 @@ async function callOpenAiImages({
   });
 
   if (!response.ok) {
+    const details = await safeResponseText(response);
     throw new AdapterExecutionError(
       `provider_http_${response.status}`,
-      `OpenAI image generation failed with HTTP ${response.status}.`,
+      `Image generation failed with HTTP ${response.status}${
+        details ? `: ${details}` : "."
+      }`,
       response.status === 429 || response.status >= 500
     );
   }
 
   const payload = (await response.json()) as {
-    data?: Array<{ b64_json?: string; url?: string }>;
+    data?: Array<{ b64_json?: string; image?: string; url?: string }>;
+    output?: Array<{ result?: string; type?: string }>;
+    url?: string;
   };
   const image = payload.data?.[0];
   if (image?.b64_json) {
     return `data:image/png;base64,${image.b64_json}`;
   }
+  if (image?.image) {
+    return normalizeImagePayload(image.image);
+  }
   if (image?.url) {
     return image.url;
+  }
+  if (payload.url) {
+    return payload.url;
+  }
+  const outputImage = payload.output?.find(
+    (candidate) => candidate.type === "image" && candidate.result
+  );
+  if (outputImage?.result) {
+    return normalizeImagePayload(outputImage.result);
   }
 
   throw new AdapterExecutionError(
     "provider_response_invalid",
-    "OpenAI image generation response did not include an image.",
+    "Image generation response did not include an image URL or base64 image.",
     true
   );
+}
+
+function normalizeImagePayload(value: string) {
+  if (
+    value.startsWith("data:") ||
+    value.startsWith("http://") ||
+    value.startsWith("https://") ||
+    value.startsWith("blob:")
+  ) {
+    return value;
+  }
+
+  return `data:image/png;base64,${value}`;
+}
+
+async function safeResponseText(response: Response) {
+  try {
+    const text = await response.text();
+    return text.trim().slice(0, 240);
+  } catch {
+    return "";
+  }
 }

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   BarChart3,
   Braces,
@@ -18,7 +18,13 @@ import { RunPanel } from "../features/workflow/components/RunPanel";
 import { WorkflowCanvas } from "../features/workflow/components/WorkflowCanvas";
 import { BlindPairwiseReviewer } from "../features/review/components/BlindPairwiseReviewer";
 import { ProviderManagementPanel } from "../features/providers/components/ProviderManagementPanel";
-import { compileWorkflow, getRun, runEventsUrl, startRun } from "../shared/api/evalApi";
+import {
+  compileWorkflow,
+  getRun,
+  runEventsUrl,
+  startRun,
+  type RunResponse
+} from "../shared/api/evalApi";
 import { useWorkflowStore } from "../features/workflow/state/workflowStore";
 
 export function App() {
@@ -37,6 +43,8 @@ function StudioApp() {
   const setCompileResult = useWorkflowStore((state) => state.setCompileResult);
   const runResult = useWorkflowStore((state) => state.runResult);
   const setRunResult = useWorkflowStore((state) => state.setRunResult);
+  const run = runResult && "run" in runResult ? runResult.run : undefined;
+  const runWarningsRef = useRef<RunResponse["warnings"]>([]);
   const [activeSidebarPanel, setActiveSidebarPanel] =
     useState<StudioSidebarPanel>("setup");
   const activePanelMeta = sidebarPanels[activeSidebarPanel];
@@ -62,18 +70,25 @@ function StudioApp() {
   };
 
   useEffect(() => {
-    const run = runResult && "run" in runResult ? runResult.run : undefined;
-    if (!run || isTerminalRunStatus(run.status)) {
+    if (runResult && "run" in runResult) {
+      runWarningsRef.current = runResult.warnings;
+    }
+  }, [runResult]);
+
+  const runId = run?.id;
+  const runStatus = run?.status;
+
+  useEffect(() => {
+    if (!runId || !runStatus || isTerminalRunStatus(runStatus)) {
       return;
     }
 
     let disposed = false;
-    const warnings = runResult && "run" in runResult ? runResult.warnings : [];
     const refresh = async () => {
       try {
-        const nextRun = await getRun(run.id);
+        const nextRun = await getRun(runId);
         if (!disposed) {
-          setRunResult({ run: nextRun, warnings });
+          setRunResult({ run: nextRun, warnings: runWarningsRef.current });
         }
       } catch {
         // Polling is best-effort; explicit user actions will surface API errors.
@@ -83,11 +98,11 @@ function StudioApp() {
     let source: EventSource | undefined;
 
     try {
-      source = new EventSource(runEventsUrl(run.id));
+      source = new EventSource(runEventsUrl(runId));
       const handleEvent = (event: MessageEvent<string>) => {
-        const payload = JSON.parse(event.data) as { run?: typeof run };
+        const payload = JSON.parse(event.data) as { run?: NonNullable<typeof run> };
         if (payload.run && !disposed) {
-          setRunResult({ run: payload.run, warnings });
+          setRunResult({ run: payload.run, warnings: runWarningsRef.current });
         }
       };
       source.addEventListener("snapshot", handleEvent);
@@ -101,7 +116,7 @@ function StudioApp() {
       window.clearInterval(interval);
       source?.close();
     };
-  }, [runResult, setRunResult]);
+  }, [runId, runStatus, setRunResult]);
 
   return (
     <div className="app-shell coss-ui-root">

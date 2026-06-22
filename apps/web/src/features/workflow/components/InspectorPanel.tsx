@@ -35,7 +35,9 @@ import {
 } from "@eval/ui";
 import {
   getNodeDefinition,
+  inferApiProviderModelType,
   type ApiProvider,
+  type ApiProviderModelType,
   type EvalNodeDefinition,
   type EvalRunRecord,
   type ImageMetric,
@@ -64,6 +66,7 @@ type AvailableModel = {
   id: string;
   name: string;
   providerLabel: string;
+  type: ApiProviderModelType;
   estimatedCostPerImageUsd: number;
   estimatedLatencyMs: number;
 };
@@ -113,6 +116,7 @@ const fallbackAvailableModels: AvailableModel[] = [
     id: "gpt-image",
     name: "GPT Image",
     providerLabel: "OpenAI",
+    type: "image",
     estimatedCostPerImageUsd: 0.045,
     estimatedLatencyMs: 4200
   },
@@ -120,6 +124,7 @@ const fallbackAvailableModels: AvailableModel[] = [
     id: "imagen",
     name: "Imagen",
     providerLabel: "Google Imagen",
+    type: "image",
     estimatedCostPerImageUsd: 0.038,
     estimatedLatencyMs: 4700
   },
@@ -127,6 +132,7 @@ const fallbackAvailableModels: AvailableModel[] = [
     id: "flux",
     name: "FLUX",
     providerLabel: "fal.ai",
+    type: "image",
     estimatedCostPerImageUsd: 0.024,
     estimatedLatencyMs: 3100
   },
@@ -134,9 +140,23 @@ const fallbackAvailableModels: AvailableModel[] = [
     id: "sdxl",
     name: "SDXL",
     providerLabel: "Replicate",
+    type: "image",
     estimatedCostPerImageUsd: 0.016,
     estimatedLatencyMs: 5600
   }
+];
+
+const modelTypeOptions: Array<{
+  label: string;
+  value: ApiProviderModelType;
+}> = [
+  { label: "Image", value: "image" },
+  { label: "Text", value: "text" },
+  { label: "Vision", value: "vision" },
+  { label: "Embedding", value: "embedding" },
+  { label: "Audio", value: "audio" },
+  { label: "Rerank", value: "rerank" },
+  { label: "Other", value: "other" }
 ];
 
 const knownMetrics: Array<{
@@ -699,12 +719,25 @@ function ModelFanoutEditor({
     queryFn: listApiProviders
   });
   const [customModel, setCustomModel] = useState("");
+  const [modelTypeFilter, setModelTypeFilter] = useState("all");
   const availableModels = useMemo(
     () => modelsFromProviders(providersQuery.data?.providers),
     [providersQuery.data?.providers]
   );
   const selectedModels = stringArrayConfig(config.models, plan.models);
   const visibleModels = mergeAvailableModels(availableModels, selectedModels);
+  const modelTypes = uniqueModelTypes(visibleModels);
+  const activeModelTypeFilter =
+    modelTypeFilter === "all" ||
+    modelTypes.includes(modelTypeFilter as ApiProviderModelType)
+      ? modelTypeFilter
+      : "all";
+  const filteredModels = visibleModels.filter(
+    (model) =>
+      activeModelTypeFilter === "all" ||
+      model.type === activeModelTypeFilter ||
+      selectedModels.includes(model.id)
+  );
   const samplesPerPrompt = numberConfig(config.samplesPerPrompt, plan.samplesPerPrompt);
   const seedStrategy = stringConfig(config.seedStrategy, plan.seedStrategy);
   const budgetUsd = numberConfig(config.budgetUsd, plan.generationBudgetUsd);
@@ -749,8 +782,27 @@ function ModelFanoutEditor({
           <ArrowRight aria-hidden="true" size={16} />
           <MetricToken label="Images" value={imageCount} strong />
         </div>
+        <div className="model-list-filter-row">
+          <label className="visual-field">
+            <span>Model type</span>
+            <SelectControl
+              onValueChange={setModelTypeFilter}
+              options={[
+                { label: "All types", value: "all" },
+                ...modelTypes.map((type) => ({
+                  label: modelTypeLabel(type),
+                  value: type
+                }))
+              ]}
+              value={activeModelTypeFilter}
+            />
+          </label>
+          <span>
+            {filteredModels.length} of {visibleModels.length} models
+          </span>
+        </div>
         <div className="model-choice-grid model-choice-grid--visual">
-          {visibleModels.map((model) => (
+          {filteredModels.map((model) => (
             <div
               className={`model-choice model-choice--visual ${
                 selectedModels.includes(model.id) ? "is-selected" : ""
@@ -764,12 +816,16 @@ function ModelFanoutEditor({
               <span>
                 <strong>{model.name}</strong>
                 <small>
-                  {model.providerLabel} · ${model.estimatedCostPerImageUsd.toFixed(3)}
+                  {model.providerLabel} · {modelTypeLabel(model.type)} · $
+                  {model.estimatedCostPerImageUsd.toFixed(3)}
                 </small>
               </span>
             </div>
           ))}
         </div>
+        {filteredModels.length === 0 ? (
+          <div className="model-choice-empty">No models match this type.</div>
+        ) : null}
         <div className="custom-model-row">
           <TextInput
             onChange={(event) => setCustomModel(event.target.value)}
@@ -2180,6 +2236,7 @@ function modelsFromProviders(providers: ApiProvider[] | undefined): AvailableMod
           id: model.id,
           name: model.name,
           providerLabel: provider.label,
+          type: inferApiProviderModelType(model.id, model.name, model.type),
           estimatedCostPerImageUsd: model.estimatedCostPerImageUsd,
           estimatedLatencyMs: model.estimatedLatencyMs
         });
@@ -2208,10 +2265,21 @@ function mergeAvailableModels(
       id: model,
       name: model,
       providerLabel: "Custom",
+      type: inferApiProviderModelType(model, model),
       estimatedCostPerImageUsd: 0.03,
       estimatedLatencyMs: 4000
     }));
   return [...availableModels, ...extras];
+}
+
+function modelTypeLabel(type: ApiProviderModelType) {
+  return modelTypeOptions.find((option) => option.value === type)?.label ?? "Other";
+}
+
+function uniqueModelTypes(models: AvailableModel[]) {
+  return Array.from(new Set(models.map((model) => model.type))).sort((left, right) =>
+    modelTypeLabel(left).localeCompare(modelTypeLabel(right))
+  );
 }
 
 function estimateGenerationCost(
